@@ -1,5 +1,7 @@
 # Web application
 
-Planned home of the responsive merchant experience and public `/pay/:id` checkout. It will own Dynamic wallet/sign-in UI and client-side QR generation, but will never decide that a payment is valid.
+Next.js landing page with the Morva brand palette, responsive sections, and an interactive simulated checkout. The demo does not connect a wallet or move funds.
 
-No implementation has started.
+From the repository root, run `npm ci` and `npm run dev`, then open http://localhost:3000. Run `npm run build` for a production build and `npm run typecheck` for TypeScript validation. No environment variables are required for the landing page.
+
+Dynamic, Aurora Intents, QR generation, and the public payment route remain unimplemented. The web application must never authoritatively mark a real payment paid.

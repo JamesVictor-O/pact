@@ -1,0 +1,12 @@
+{
+  "name": "morva",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@morva/web",
+    "build": "npm run build --workspace=@morva/web",
+    "typecheck": "npm run typecheck --workspace=@morva/web"
+  }
+}

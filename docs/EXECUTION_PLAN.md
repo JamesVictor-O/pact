@@ -1,6 +1,6 @@
 # Morva — Metropolis Hackathon Execution Plan
 
-Status: **Awaiting review; implementation is blocked until approval**
+Status: **Landing page implementation authorized; payment integrations remain gated on review and feasibility checks**
 
 Track: Consumer Products & Payments
 

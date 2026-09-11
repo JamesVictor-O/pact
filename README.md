@@ -40,11 +40,11 @@ The payment and verification providers are confirmed. Application framework choi
 - **Aurora Intents**: Cross-chain buyer funding through NEAR Intents and HOT Bridge routing
 - **Envio**: Monad transfer indexing and the backend's on-chain verification source
 - **Dynamic**: Buyer wallet creation, authentication, and transaction signing
-- **Next.js**: Proposed web framework, not yet locked
-- **TypeScript**: Proposed language for the web, API, shared packages, and indexer integration
+- **Next.js**: Landing page framework
+- **TypeScript**: Web application language; proposed for the API, shared packages, and indexer integration
 - **PostgreSQL**: Proposed metadata and payment-record database, not yet locked
 
-The initial Monad network, settlement stablecoin, API framework, package manager, and deployment platform remain open technical decisions. The Aurora Intents route and Monad gas behavior must also pass the feasibility spike before implementation depends on them.
+The initial Monad network, settlement stablecoin, API framework, and deployment platform remain open technical decisions. The workspace uses npm. The Aurora Intents route and Monad gas behavior must pass the feasibility spike before implementation depends on them.
 
 ## Security and non-custodial model
 
@@ -56,15 +56,24 @@ Payment links store immutable settlement terms in integer token base units. Paid
 
 ## Getting started locally
 
-Local setup is not available yet. The repository currently contains the planning scaffold, but no application workspaces, package manifest, dependency lockfile, database schema, or runnable services.
+The Next.js landing page runs locally with npm. From the repository root:
 
-Before publishing setup commands, complete these items:
+```sh
+npm ci
+npm run dev
+```
 
-1. Choose the package manager and initialize the TypeScript workspace
-2. Lock the web, API, database, and test frameworks
+Open http://localhost:3000. The landing page requires no environment variables. Its interactive checkout is a simulation and does not move funds.
+
+Run `npm run build` for a production build and `npm run typecheck` for TypeScript validation. Automated payment tests and backend setup remain TODOs.
+
+Remaining backend and payment setup TODOs:
+
+1. Extend the workspace to the API and indexer
+2. Lock the API, database, and test frameworks
 3. Add `.env.example` files with documented variables and non-secret placeholders
 4. Add database migration and seed commands
-5. Add development commands for `apps/web`, `apps/api`, and `apps/indexer`
+5. Add development commands for `apps/api` and `apps/indexer`
 6. Add unit, integration, and end-to-end test commands
 
 Expected environment configuration will cover these purposes, but the final variable names have not been defined:
@@ -81,7 +90,7 @@ Use placeholders such as `your_env_id_here` and `postgresql://user:password@loca
 
 ## Current implementation status and scope
 
-Morva is in the planning and feasibility stage. The repository structure and [execution plan](docs/EXECUTION_PLAN.md) exist, but the web application, API, indexer, database schema, and payment flow are not yet implemented.
+Morva has a responsive landing page and a simulated checkout preview. The merchant dashboard, real checkout, API, indexer, database schema, and payment flow are not yet implemented. The [execution plan](docs/EXECUTION_PLAN.md) describes their dependencies.
 
 The planned initial scope contains:
 
