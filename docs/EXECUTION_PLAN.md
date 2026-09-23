@@ -1,6 +1,6 @@
 # Morva — Metropolis Hackathon Execution Plan
 
-Status: **Landing page implementation authorized; payment integrations remain gated on review and feasibility checks**
+Status: **Build authorized; Gate 1 payment feasibility spike in progress. See [spike evidence](PAYMENT_SPIKE.md).**
 
 Track: Consumer Products & Payments
 
