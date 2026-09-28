@@ -4,9 +4,9 @@ import "@fontsource/inter/600.css";
 import "./story.css";
 
 export const metadata: Metadata = {
-  title: "Morva — A payment link. More ways to pay.",
+  title: "Pact — Financial infrastructure for events",
   description:
-    "Share a payment link. Let buyers pay with supported crypto assets and receive your chosen stablecoin on Monad. Explore the Morva product preview.",
+    "Manage event funding, vendor commitments, payment schedules, and payouts from one place.",
 };
 
 export default function RootLayout({

@@ -1,5 +1,5 @@
 # Contracts (architecture gate)
 
-The MVP does **not** currently require a Morva smart contract: direct buyer-to-merchant settlement plus independent Envio verification is the simplest non-custodial design.
+Pact may require narrowly scoped Monad contracts for event funding, allocations, vendor releases, and eligible refunds. Contract scope must follow the documented state model and be validated before implementation.
 
-This directory is reserved only if the week-one spike proves a narrowly scoped Monad contract or account-abstraction component is necessary. Adding one requires an explicit architecture decision and user approval because it increases audit and delivery risk.
+This directory is reserved for that validated settlement layer. Any custody, upgrade, or authorization design requires an explicit architecture decision because it changes audit and delivery risk.

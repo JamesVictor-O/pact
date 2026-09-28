@@ -6,7 +6,7 @@ import { ArrowDown, ArrowRight, Check } from "lucide-react";
 /* Product visual storyboard:
  *   0ms  payment terms and controls are visible
  *  80ms  secondary preview settles into position
- * 150ms  checkout state transition completes
+ * 150ms  funding state transition completes
  */
 export const TIMING = { scene: 0.08, detail: 0.2, update: 0.15 };
 type Kind =
@@ -14,8 +14,8 @@ type Kind =
   | "link"
   | "share"
   | "verification"
-  | "merchant"
-  | "buyer"
+  | "organizer"
+  | "sponsor"
   | "route";
 
 export function PaymentVisual({
@@ -45,10 +45,10 @@ export function PaymentVisual({
         <span>
           {kind === "settlement"
             ? "One payment. End to end."
-            : kind === "merchant"
-              ? "Payment activity"
-              : kind === "buyer"
-                ? "Your checkout"
+            : kind === "organizer"
+              ? "Organizer activity"
+              : kind === "sponsor"
+                ? "Your funding"
                 : kind === "route"
                   ? "Example funding route"
                   : "Product preview"}
@@ -59,20 +59,20 @@ export function PaymentVisual({
         <>
           <div className="visual-panel">
             <div className="visual-row">
-              <span>Payment request</span>
+              <span>Event funding</span>
               <span className="visual-id">#1042</span>
             </div>
             <div className="visual-amount">
               25.00 <span>USDC</span>
             </div>
             <div className="visual-row muted">
-              <span>Merchant settlement</span>
+              <span>Event settlement</span>
               <span>Monad</span>
             </div>
           </div>
           <div className="visual-connector">
             <ArrowDown aria-hidden="true" />
-            <span>Buyer chooses a funding route</span>
+            <span>Sponsor chooses a funding route</span>
           </div>
           <div className="funding-row">
             <span>USDC on Base</span>
@@ -86,10 +86,10 @@ export function PaymentVisual({
           <div className="verification-receipt">
             <div>
               <Check aria-hidden="true" />
-              <strong>Merchant receipt</strong>
+              <strong>Event receipt</strong>
             </div>
             <div className="visual-row">
-              <span>Link marked paid</span>
+              <span>Funding received</span>
               <strong>25.00 USDC</strong>
             </div>
             <small>Illustrative outcome. No real transfer.</small>
@@ -99,7 +99,7 @@ export function PaymentVisual({
       {kind === "link" && (
         <div className="visual-panel">
           <div className="visual-row">
-            <span>New payment link</span>
+            <span>New funding link</span>
             <span>#1042</span>
           </div>
           <div className="visual-amount">
@@ -117,8 +117,8 @@ export function PaymentVisual({
       )}
       {kind === "share" && (
         <div className="visual-panel">
-          <span className="muted">Payment link</span>
-          <div className="sample-url">morva.link/pay/example</div>
+          <span className="muted">Funding link</span>
+          <div className="sample-url">pact.events/fund/example</div>
           <div className="share-channels">
             <span>Message</span>
             <span>Invoice</span>
@@ -149,7 +149,7 @@ export function PaymentVisual({
           </div>
         </div>
       )}
-      {kind === "merchant" && (
+      {kind === "organizer" && (
         <div className="visual-panel">
           <div className="visual-row">
             <span>Example link</span>
@@ -174,18 +174,18 @@ export function PaymentVisual({
           ))}
         </div>
       )}
-      {kind === "buyer" && (
+      {kind === "sponsor" && (
         <div className="visual-panel">
           <div className="visual-row">
-            <span>Amount due</span>
+            <span>Funding amount</span>
             <strong>25.00 USDC</strong>
           </div>
-          <div className="buyer-choice">
+          <div className="sponsor-choice">
             <span>Example source</span>
             <strong>USDC on Base</strong>
           </div>
           <div className="visual-row muted">
-            <span>Merchant receives</span>
+            <span>Event receives</span>
             <span>USDC on Monad</span>
           </div>
           <p className="visual-note">
@@ -196,7 +196,7 @@ export function PaymentVisual({
       {kind === "route" && (
         <>
           <div className="route-endpoint">
-            <span>Buyer funds with</span>
+            <span>Sponsor funds with</span>
             <strong>USDC on Base</strong>
           </div>
           <div className="visual-connector">
@@ -204,7 +204,7 @@ export function PaymentVisual({
             <span>Aurora Intents</span>
           </div>
           <div className="route-endpoint">
-            <span>Merchant receives</span>
+            <span>Event receives</span>
             <strong>USDC on Monad</strong>
           </div>
           <p className="visual-note">

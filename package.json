@@ -1,5 +1,5 @@
 {
-  "name": "morva",
+  "name": "pact",
   "private": true,
   "workspaces": [
     "apps/web"
@@ -7,8 +7,8 @@
   "scripts": {
     "spike:payments": "node scripts/payment-spike.mjs",
     "test:spike": "node --test scripts/payment-spike.test.mjs",
-    "dev": "npm run dev --workspace=@morva/web",
-    "build": "npm run build --workspace=@morva/web",
-    "typecheck": "npm run typecheck --workspace=@morva/web"
+    "dev": "npm run dev --workspace=@pact/web",
+    "build": "npm run build --workspace=@pact/web",
+    "typecheck": "npm run typecheck --workspace=@pact/web"
   }
 }

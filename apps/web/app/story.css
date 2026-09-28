@@ -534,8 +534,8 @@ body {
   width: 100%;
 }
 
-/* Interactive Checkout Sandbox (Chapter 02) */
-.demo-checkout-box {
+/* Interactive sponsor funding preview (Chapter 02) */
+.demo-funding-box {
   display: flex;
   flex-direction: column;
   gap: 20px;

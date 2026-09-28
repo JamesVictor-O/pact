@@ -1,5 +1,5 @@
 # Domain package
 
-Planned shared definitions for links, payments, supported settlement assets, exact-amount rules, expiry, and the monotonic `pending -> paid | expired` state machine.
+Planned shared definitions for events, funding commitments, receipts, obligations, allocations, releases, refunds, supported settlement assets, and their state transitions.
 
 No implementation has started.

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-export default function Morva3DCard() {
+export default function PactFinanceCard() {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -53,11 +53,11 @@ export default function Morva3DCard() {
       // Brand Wordmark
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 44px sans-serif";
-      ctx.fillText("morva", 64, 96);
+      ctx.fillText("pact", 64, 96);
 
       ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
       ctx.font = "24px sans-serif";
-      ctx.fillText("MONAD SETTLEMENT", 720, 96);
+      ctx.fillText("EVENT FINANCE", 720, 96);
 
       // EMV Chip Graphic
       ctx.fillStyle = "#d4af37";

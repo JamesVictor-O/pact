@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 // SSR-Safe Dynamic Imports for WebGL Three.js Components
-const Morva3DCard = dynamic(() => import("./Morva3DCard"), { ssr: false });
+const PactFinanceCard = dynamic(() => import("./PactFinanceCard"), { ssr: false });
 const CrossChain3DRing = dynamic(() => import("./CrossChain3DRing"), { ssr: false });
 
 /* Interactive Ambient Canvas Component */
@@ -88,10 +88,10 @@ function AmbientCanvas() {
 }
 
 const chapters = [
-  { id: "hero", name: "01 / The Link" },
-  { id: "demo", name: "02 / The Checkout" },
-  { id: "how-it-works", name: "03 / How It Works" },
-  { id: "ledger", name: "04 / Two Sides" },
+  { id: "hero", name: "01 / The Pact" },
+  { id: "demo", name: "02 / Funding" },
+  { id: "how-it-works", name: "03 / Allocation" },
+  { id: "ledger", name: "04 / Visibility" },
 ];
 
 const routes = [
@@ -129,7 +129,7 @@ export default function Home() {
     document.getElementById(id)?.scrollIntoView({ behavior: reduced ? "instant" : "smooth" });
   };
 
-  const handleSimulatePayment = () => {
+  const handleSimulateFunding = () => {
     setDemoStage("processing");
     setTimeout(() => {
       setDemoStage("settled");
@@ -143,8 +143,8 @@ export default function Home() {
       {/* Comacard-Inspired Floating Capsule Glass Navbar */}
       <header className="site-header">
         <div className="logo">
-          <div className="logo-symbol">M</div>
-          <span>morva</span>
+          <div className="logo-symbol">P</div>
+          <span>pact</span>
         </div>
 
         <nav aria-label="Main narrative navigation">
@@ -160,7 +160,7 @@ export default function Home() {
         </nav>
 
         <button className="header-action-button" onClick={() => scrollToChapter("demo")}>
-          <span>Create Payment Link</span>
+          <span>Create a Pact</span>
           <ArrowRight size={16} />
         </button>
       </header>
@@ -171,11 +171,11 @@ export default function Home() {
           <div className="hero-content">
           
 
-            <h1 className="hero-title">The Future of Payments</h1>
+            <h1 className="hero-title">Know what is funded, due, and ready to pay.</h1>
 
             <p className="hero-subtitle">
-              Enjoy Frictionless Spend Management With Morva Shareable Payment Links.
-              Pay with any crypto &amp; get instant settlement on Monad in USDC.
+              Pact turns an event budget into a live financial system for funding,
+              vendor commitments, payment schedules, and payouts.
             </p>
 
             {/* Email / Link Generator Input Bar */}
@@ -189,7 +189,9 @@ export default function Home() {
               <Mail size={18} style={{ color: "var(--muted)", flexShrink: 0 }} />
               <input
                 type="email"
-                placeholder="Your Email Address"
+                placeholder="Work email address"
+                aria-label="Work email address"
+                autoComplete="email"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
               />
@@ -204,7 +206,7 @@ export default function Home() {
           {/* WebGL 3D Interactive Card Scene & Responsive Micro Card Overlay */}
           <div className="hero-stage-container">
             {/* Real Three.js WebGL Interactive 3D Render */}
-            <Morva3DCard />
+            <PactFinanceCard />
 
             {/* Responsive Micro Cards & Real Image Badges */}
             <div className="hero-floating-grid">
@@ -227,10 +229,10 @@ export default function Home() {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <Sparkles size={16} />
-                  <strong style={{ fontSize: 13 }}>Rewards Program</strong>
+                  <strong style={{ fontSize: 13 }}>Funding coverage</strong>
                 </div>
                 <p style={{ fontSize: 12, margin: 0, opacity: 0.9 }}>
-                  Rewards from brands you love with every Monad transfer.
+                  See which obligations are funded before they become urgent.
                 </p>
               </motion.div>
 
@@ -242,10 +244,10 @@ export default function Home() {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <ShieldCheck size={16} />
-                  <strong style={{ fontSize: 13 }}>Bank-Grade Security</strong>
+                  <strong style={{ fontSize: 13 }}>Clear allocations</strong>
                 </div>
                 <p style={{ fontSize: 12, margin: 0, opacity: 0.9 }}>
-                  We take your money matters seriously so that you don't have to.
+                  Every received dollar can be traced to an event obligation.
                 </p>
               </motion.div>
 
@@ -255,8 +257,8 @@ export default function Home() {
                 animate={{ y: [0, -5, 0] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
               >
-                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>INVOICE DUE</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>$200.00</div>
+                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>VENUE DEPOSIT</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>$8,000.00</div>
                 <div style={{ fontSize: 11, background: "rgba(0,0,0,0.06)", padding: "2px 8px", borderRadius: 99, display: "inline-block", marginTop: 4 }}>
                   Due in 2 days
                 </div>
@@ -275,19 +277,19 @@ export default function Home() {
                 </div>
               </motion.div>
 
-              {/* Floating Real Image Card 2: Merchant Studio Mobile Payment */}
+              {/* Floating event payment confirmation card */}
               <motion.div
                 className="floating-image-card img-card-studio"
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
               >
-                <img src="/merchant_studio.png" alt="Merchant Payment Confirmation" />
+                <img src="/event_payment.png" alt="Event payment confirmation" />
                 <div className="image-card-body">
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <Check size={14} color="var(--success)" />
-                    <span>Instant Settlement</span>
+                  <span>Vendor payment released</span>
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--muted)" }}>Verified via Monad Indexer</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>Receipt recorded on Monad</div>
                 </div>
               </motion.div>
 
@@ -298,13 +300,13 @@ export default function Home() {
                 transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
               >
                 <div className="status-dot" />
-                <span>Payment reference 312 · Captured £2,000.00</span>
+                <span>Production payment · Fully funded</span>
               </motion.div>
             </div>
 
             {/* Accepted Payment Methods Bar */}
             <div className="accepted-methods-bar">
-              <span>Payment methods accepted:</span>
+              <span>Funding sources:</span>
               <span className="method-tag">VISA</span>
               <span className="method-tag">MASTERCARD</span>
               <span className="method-tag">AMEX</span>
@@ -315,48 +317,48 @@ export default function Home() {
           </div>
         </section>
 
-        {/* CHAPTER 02: THE CHECKOUT (LIVE INTERACTIVE DEMO) */}
+        {/* CHAPTER 02: SPONSOR FUNDING (LIVE INTERACTIVE DEMO) */}
         <section id="demo" className="story-chapter">
           <div className="chapter-text-content">
-            <span className="chapter-step-label">02 / The Checkout</span>
-            <h2 className="chapter-heading">Step into their checkout.</h2>
+            <span className="chapter-step-label">02 / Sponsor funding</span>
+            <h2 className="chapter-heading">Fund the part of the event that matters.</h2>
             <p className="chapter-body">
-              The amount stays the same. Your customer picks an available funding route from the assets they already hold on any supported chain. Morva handles cross-chain routing seamlessly.
+              Sponsors see the event and obligation they are funding, choose an available payment source, and receive a clear receipt. Pact handles the cross-chain route underneath.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600 }}>
                 <Check size={18} color="var(--success)" />
-                <span>Zero buyer friction</span>
+                <span>No manual bridging</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600 }}>
                 <Check size={18} color="var(--success)" />
-                <span>Instant Monad USDC settlement</span>
+                <span>Committed and received stay distinct</span>
               </div>
             </div>
           </div>
 
           <div className="visual-panel-card">
-            <div className="demo-checkout-box">
+            <div className="demo-funding-box">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>
-                <span>Morva Link Checkout Preview</span>
+                <span>Pact sponsor funding preview</span>
                 <span style={{ background: "var(--canvas)", padding: "2px 8px", borderRadius: 6, border: "1px solid var(--line)" }}>Interactive</span>
               </div>
 
-              {/* Merchant & Product Row with Real Ceramic Mug Image */}
+              {/* Event and obligation summary */}
               <div className="demo-product-row">
                 <img src="/ceramic_mug.png" alt="Ceramic Mug" />
                 <div style={{ textAlign: "left" }}>
-                  <strong style={{ fontSize: 16, display: "block" }}>Studio Forma</strong>
-                  <span style={{ fontSize: 13, color: "var(--muted)" }}>Handcrafted Ceramic Mug · One piece</span>
+                  <strong style={{ fontSize: 16, display: "block" }}>Lagos Design Week</strong>
+                  <span style={{ fontSize: 13, color: "var(--muted)" }}>Production · Stage and sound deposit</span>
                   <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4, color: "var(--ink)" }}>
-                    25.00 <span style={{ fontSize: 13, fontWeight: 500 }}>USDC</span>
+                    3,000.00 <span style={{ fontSize: 13, fontWeight: 500 }}>USDC</span>
                   </div>
                 </div>
               </div>
 
               {/* Route Selector Dropdown */}
               <div className="demo-route-selector">
-                <label htmlFor="route-select">Select Funding Asset &amp; Chain:</label>
+                <label htmlFor="route-select">Choose payment source</label>
                 <select
                   id="route-select"
                   value={selectedRoute}
@@ -373,8 +375,8 @@ export default function Home() {
 
               {/* Payment Action Button */}
               {demoStage === "idle" && (
-                <button className="demo-pay-btn" onClick={handleSimulatePayment}>
-                  <span>Pay $25.00 USDC</span>
+                <button className="demo-pay-btn" onClick={handleSimulateFunding}>
+                  <span>Fund $3,000.00 USDC</span>
                   <ArrowRight size={16} />
                 </button>
               )}
@@ -382,7 +384,7 @@ export default function Home() {
               {demoStage === "processing" && (
                 <div style={{ padding: 16, background: "var(--canvas)", borderRadius: 16, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
                   <RefreshCw size={18} style={{ animation: "spin 1s linear infinite" }} />
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>Executing Aurora Intent &amp; Indexing Transfer...</span>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>Funding in progress through Aurora Intents...</span>
                 </div>
               )}
 
@@ -390,13 +392,13 @@ export default function Home() {
                 <div>
                   <div className="demo-status-box">
                     <Check size={20} />
-                    <span>Payment Verified! Link marked PAID on Monad.</span>
+                    <span>Funding received. $3,000 is now available to allocate.</span>
                   </div>
                   <button
                     style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 13, textDecoration: "underline", marginTop: 12, cursor: "pointer" }}
                     onClick={() => setDemoStage("idle")}
                   >
-                    Reset Interactive Demo
+                    Reset funding demo
                   </button>
                 </div>
               )}
@@ -414,9 +416,9 @@ export default function Home() {
               <div className="pipeline-step-item active-step">
                 <div className="step-num">1</div>
                 <div>
-                  <strong style={{ fontSize: 15, display: "block" }}>1. Merchant Creates Payment Link</strong>
+                  <strong style={{ fontSize: 15, display: "block" }}>1. Organizer creates an event</strong>
                   <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                    Merchant inputs amount ($25.00) and Monad USDC settlement preference.
+                    The organizer records the budget, event date, funding sources, and obligations.
                   </span>
                 </div>
               </div>
@@ -424,9 +426,9 @@ export default function Home() {
               <div className="pipeline-step-item active-step">
                 <div className="step-num">2</div>
                 <div>
-                  <strong style={{ fontSize: 15, display: "block" }}>2. Buyer Chooses Funding Asset</strong>
+                  <strong style={{ fontSize: 15, display: "block" }}>2. Sponsor funds an obligation</strong>
                   <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                    Buyer opens <code style={{ background: "rgba(0,0,0,0.06)", padding: "2px 6px", borderRadius: 4 }}>/pay/:id</code> and selects Base USDC, ETH, or SOL.
+                    The sponsor opens a funding link and chooses Base USDC, ETH, or SOL.
                   </span>
                 </div>
               </div>
@@ -436,7 +438,7 @@ export default function Home() {
                 <div>
                   <strong style={{ fontSize: 15, display: "block" }}>3. Aurora Intent Execution</strong>
                   <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                    Cross-chain intent routes and settles USDC directly to merchant's Monad address.
+                    Cross-chain funding settles as USDC into the event's financial system on Monad.
                   </span>
                 </div>
               </div>
@@ -444,9 +446,9 @@ export default function Home() {
               <div className="pipeline-step-item active-step">
                 <div className="step-num">4</div>
                 <div>
-                  <strong style={{ fontSize: 15, display: "block" }}>4. Independent Envio Verification</strong>
+                  <strong style={{ fontSize: 15, display: "block" }}>4. Funds become available</strong>
                   <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                    Envio indexes Monad block. Morva backend matches tx identity and marks link paid in 1 DB tx.
+                    Pact verifies receipt, updates coverage, and makes eligible funds available to allocate.
                   </span>
                 </div>
               </div>
@@ -454,30 +456,30 @@ export default function Home() {
           </div>
 
           <div className="chapter-text-content">
-            <span className="chapter-step-label">03 / The Verification</span>
-            <h2 className="chapter-heading">A payment isn't paid until it's verified.</h2>
+            <span className="chapter-step-label">03 / Allocation and coverage</span>
+            <h2 className="chapter-heading">A promise is not cash. Available cash is not free cash.</h2>
             <p className="chapter-body">
-              Morva checks the transfer on Monad before updating the link. A wallet confirmation alone doesn't close the sale—independent backend indexing guarantees security.
+              Pact separates committed, received, available, and allocated money so organizers can spot a cash gap before a vendor payment is missed.
             </p>
             <div style={{ background: "var(--canvas)", border: "1px solid var(--line)", padding: 20, borderRadius: 20, width: "100%" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, fontWeight: 600 }}>
                 <Lock size={18} color="var(--accent)" />
-                <span>Non-Custodial Guarantee</span>
+                <span>Programmable settlement</span>
               </div>
               <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
-                Morva never holds payment funds. Funds transfer directly on-chain to the merchant's recorded Monad address.
+                Allocations, releases, receipts, and eligible refunds are represented on Monad while the interface stays focused on normal financial actions.
               </p>
             </div>
           </div>
         </section>
 
-        {/* CHAPTER 04: TWO SIDES, ONE RAIL */}
+        {/* CHAPTER 04: THREE USERS, ONE FINANCIAL STATE */}
         <section id="ledger" className="story-chapter">
           <div className="chapter-text-content">
-            <span className="chapter-step-label">04 / Two Sides, One Rail</span>
-            <h2 className="chapter-heading">Their confirmation. Your peace of mind.</h2>
+            <span className="chapter-step-label">04 / One financial state</span>
+            <h2 className="chapter-heading">Organizers, sponsors, and vendors see what they need.</h2>
             <p className="chapter-body">
-              One payment connects two views. The buyer knows it's complete with an instant digital receipt. The merchant knows exactly what arrived in their Monad settlement wallet.
+              Sponsors know what they funded. Vendors know what is covered and due. Organizers know whether the event can meet its next obligations.
             </p>
             <button className="header-action-button" onClick={() => scrollToChapter("hero")}>
               <span>Back to Top</span>
@@ -487,30 +489,30 @@ export default function Home() {
 
           <div className="visual-panel-card">
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              {/* Buyer View Box */}
+              {/* Sponsor view */}
               <div style={{ background: "var(--canvas)", padding: 20, borderRadius: 20, border: "1px solid var(--line)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 8 }}>
-                  <span>BUYER CONFIRMATION RECEIPT</span>
-                  <span style={{ color: "var(--success)" }}>COMPLETED</span>
+                  <span>SPONSOR FUNDING RECEIPT</span>
+                  <span style={{ color: "var(--success)" }}>RECEIVED</span>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>25.00 USDC</div>
+                <div style={{ fontSize: 22, fontWeight: 700 }}>3,000.00 USDC</div>
                 <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
-                  Paid to Studio Forma via Base Route
+                  Funding Lagos Design Week production via Base
                 </div>
                 <div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--muted)", marginTop: 8 }}>
                   Tx: 0x8a92...f3b1
                 </div>
               </div>
 
-              {/* Merchant View Box */}
+              {/* Organizer view */}
               <div style={{ background: "var(--ink)", color: "#ffffff", padding: 20, borderRadius: 20 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700, opacity: 0.7, marginBottom: 8 }}>
-                  <span>MERCHANT SETTLEMENT LEDGER</span>
-                  <span style={{ color: "var(--mint)" }}>SETTLED ON MONAD</span>
+                  <span>ORGANIZER COVERAGE VIEW</span>
+                  <span style={{ color: "var(--mint)" }}>LIVE</span>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>+$25.00 USDC</div>
+                <div style={{ fontSize: 22, fontWeight: 700 }}>$13,000 received · $3,500 gap</div>
                 <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4 }}>
-                  Matched Link #1042 · Envio Indexer Verified
+                  $16,500 due within 14 days · Updated from verified funding
                 </div>
               </div>
             </div>

@@ -1,4 +1,4 @@
-# Morva brand
+# Pact brand
 
 Canvas #FAFAF8; surface #FFFFFF; ink #16161A; muted #6F6F76; hairline #E3E3DF.
 Accent #2D5BFF appears on only one element per view.

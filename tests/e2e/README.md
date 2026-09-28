@@ -1,5 +1,5 @@
 # End-to-end tests
 
-Planned acceptance coverage for link creation, public checkout, successful verified settlement, replay rejection, mismatch rejection, and expiry behavior.
+Planned acceptance coverage for event creation, sponsor funding, verified settlement, allocation, vendor releases, eligible refunds, replay rejection, and funding-gap calculations.
 
 No implementation has started.

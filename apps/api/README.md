@@ -1,5 +1,5 @@
 # API service
 
-Planned home of merchant/link metadata endpoints and the server-side verification coordinator. It may request and read indexed chain data, but it must never custody funds or accept a client payment claim as proof.
+Planned home of event, funding-source, obligation, allocation, payout, and refund endpoints. The service coordinates indexed settlement verification, but it must never accept a client-submitted payment claim as proof.
 
 No implementation has started.

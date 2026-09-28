@@ -14,7 +14,7 @@ stack:
 architecture:
   pattern: non-custodial payment-link monorepo with independent indexed verification
   decisions:
-    - direct buyer-to-merchant settlement
+    - sponsor funding into an event's programmable settlement layer
     - no custom contract by default
     - backend is authoritative for payment state
     - implementation gated on gas/route feasibility spike
