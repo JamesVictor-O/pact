@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dynamic-labs/sdk-react-core": "^5.9.2",
     "@fontsource/inter": "^5.2.0",
     "@types/three": "^0.186.0",
     "framer-motion": "^13.2.0",

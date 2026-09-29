@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/600.css";
 import "./story.css";
+import "./onboarding.css";
+import PactAuthProvider from "./components/PactAuthProvider";
 
 const siteDescription =
   "Plan event funding, track sponsor contributions, allocate received funds, and release vendor payments from one clear financial operating system.";
@@ -83,8 +85,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" data-scroll-behavior="smooth">
+      <body><PactAuthProvider>{children}</PactAuthProvider></body>
     </html>
   );
 }
