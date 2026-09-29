@@ -9,7 +9,7 @@
     "spike:payments": "node scripts/payment-spike.mjs",
     "test:spike": "node --test scripts/payment-spike.test.mjs",
     "test:domain": "npm test --workspace=@pact/domain",
-    "test": "npm run test:spike && npm run test:domain",
+    "test": "npm run test:spike && npm run test:domain && npm test --workspace=@pact/web",
     "dev": "npm run dev --workspace=@pact/web",
     "build": "npm run build --workspace=@pact/web",
     "typecheck": "npm run typecheck --workspaces --if-present"

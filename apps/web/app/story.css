@@ -1,7 +1,7 @@
 :root {
   --canvas: #fafaf8; --surface: #ffffff; --ink: #16161a; --muted: #606067; --line: #e3e3df;
   --accent: #2d5bff; --accent-hover: #234bd9; --mint: #dcf2e5; --butter: #f8e9a8;
-  --peach: #fbe3d6; --lilac: #e7e3f6; --success: #1e6d42; --radius-card: 28px;
+  --peach: #fbe3d6; --lilac: #e7e3f6; --success: #1e6d42; --error: #b3392b; --radius-card: 28px;
   --soft: #f1f1ee; --radius-control: 999px; color-scheme: light;
 }
 * { box-sizing: border-box; }

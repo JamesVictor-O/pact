@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { ArrowRight, Check, CircleDollarSign, ReceiptText } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getExpenseSummary, getUpcomingPayments } from "../../../lib/expenses";
+import { formatEventCurrency, getFundingSummary, type FundingSummary } from "../../../lib/funding";
+import { expenseRepository, fundingRepository } from "../../../lib/pact-storage";
+import type { ExpenseRecord } from "../../../lib/pact-types";
 import { useCurrentEvent } from "./EventShell";
-
-function formatCurrency(value: number, currency: string): string {
-  return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
-}
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("en", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
@@ -17,12 +18,21 @@ export default function EventOverview() {
   const event = useCurrentEvent();
   const searchParams = useSearchParams();
   const justCreated = searchParams.get("created") === "1";
-  const zero = formatCurrency(0, event.displayCurrency);
+  const [funding, setFunding] = useState<FundingSummary>(() => getFundingSummary([]));
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+
+  useEffect(() => {
+    setFunding(getFundingSummary(fundingRepository.listByEvent(event.id)));
+    setExpenses(expenseRepository.listByEvent(event.id));
+  }, [event.id]);
+
+  const expenseSummary = getExpenseSummary(expenses);
+  const upcomingPayments = getUpcomingPayments(expenses).slice(0, 3);
   const summary = [
-    { label: "Estimated budget", value: formatCurrency(event.estimatedBudget, event.displayCurrency), note: "Working plan" },
-    { label: "Funding received", value: zero, note: "No funding added" },
-    { label: "Committed to vendors", value: zero, note: "No expenses added" },
-    { label: "Available", value: zero, note: "Received minus allocated" },
+    { label: "Estimated budget", value: formatEventCurrency(event.estimatedBudget, event.displayCurrency), note: "Working plan" },
+    { label: "Funding received", value: formatEventCurrency(funding.received, event.displayCurrency), note: funding.received > 0 ? `${formatEventCurrency(funding.stillExpected, event.displayCurrency)} still expected` : "No funding received" },
+    { label: "Committed to vendors", value: formatEventCurrency(expenseSummary.totalCommitted, event.displayCurrency), note: expenseSummary.totalCommitted > 0 ? `${formatEventCurrency(expenseSummary.unfunded, event.displayCurrency)} unfunded` : "No expenses added" },
+    { label: "Available", value: formatEventCurrency(funding.available, event.displayCurrency), note: "Received minus allocated" },
   ];
 
   return <div className="overview-page">
@@ -42,6 +52,6 @@ export default function EventOverview() {
       </div>
     </section>
 
-    <section className="upcoming-empty" aria-labelledby="upcoming-heading"><div><h2 id="upcoming-heading">Upcoming payments</h2><p>Vendor payment schedules will appear here once you add an expense.</p></div><span>Nothing due yet</span></section>
+    {upcomingPayments.length === 0 ? <section className="upcoming-empty" aria-labelledby="upcoming-heading"><div><h2 id="upcoming-heading">Upcoming payments</h2><p>Payments due in the next 30 days will appear here.</p></div><span>Nothing due soon</span></section> : <section className="overview-upcoming" aria-labelledby="upcoming-heading"><header><div><h2 id="upcoming-heading">Upcoming payments</h2><p>Unpaid schedule items due in the next 30 days.</p></div><Link href={`/events/${event.id}/payments?filter=upcoming`}>View payments <ArrowRight aria-hidden="true" /></Link></header><div>{upcomingPayments.map(({ expense, payment }) => <Link key={payment.id} href={`/events/${event.id}/payments/${payment.id}`}><span><strong>{payment.label}</strong><small>{expense.title} · {expense.vendorName}</small></span><span><strong>{formatEventCurrency(payment.amount - payment.paidAmount, event.displayCurrency)}</strong><small>{formatDate(payment.dueDate as string)}</small></span></Link>)}</div></section>}
   </div>;
 }
