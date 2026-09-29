@@ -2,13 +2,16 @@
   "name": "pact",
   "private": true,
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "packages/domain"
   ],
   "scripts": {
     "spike:payments": "node scripts/payment-spike.mjs",
     "test:spike": "node --test scripts/payment-spike.test.mjs",
+    "test:domain": "npm test --workspace=@pact/domain",
+    "test": "npm run test:spike && npm run test:domain",
     "dev": "npm run dev --workspace=@pact/web",
     "build": "npm run build --workspace=@pact/web",
-    "typecheck": "npm run typecheck --workspace=@pact/web"
+    "typecheck": "npm run typecheck --workspaces --if-present"
   }
 }
