@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { authClient, eventRepository, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
+import { agreementRepository, authClient, eventRepository, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
 import { usePactAuth } from "../components/PactAuthProvider";
 
 export default function AuthEntry() {
@@ -26,7 +26,8 @@ export default function AuthEntry() {
 
   async function finishAuthentication(user: Awaited<ReturnType<typeof authClient.signInWithEmail>>) {
     const events = eventRepository.listByOwner(user.id);
-    const destination = events.length > 0 ? "/dashboard" : "/events/new";
+    const pendingAgreements = agreementRepository.listForEmail(user.email);
+    const destination = events.length > 0 ? "/dashboard" : pendingAgreements.length > 0 ? "/agreements" : "/events/new";
     if (isDynamicAuthConfigured) router.replace(destination);
     else window.location.assign(destination);
   }
@@ -96,7 +97,7 @@ export default function AuthEntry() {
   return <main className="auth-page">
     <section className="auth-brand-panel" aria-label="About Pact">
       <Link href="/" className="auth-back"><ArrowLeft aria-hidden="true" /> Back to Pact</Link>
-      <div><Image className="auth-logo" src="/pact-primary-logo.svg" alt="Pact" width={132} height={40} priority /><h1>Start with the event. See every dollar clearly.</h1><p>Create the financial workspace your team, sponsors, and vendors can trust.</p></div>
+      <div><Image className="auth-logo" src="/pact-primary-logo.svg" alt="Pact" width={132} height={40} priority /><h1>Start with the event. See every dollar clearly.</h1><p>Create the financial workspace your team, sponsors, and payees can trust.</p></div>
       <p className="auth-brand-note">Committed funding never counts as cash until it arrives.</p>
     </section>
     <section className="auth-form-panel" aria-labelledby="auth-heading">

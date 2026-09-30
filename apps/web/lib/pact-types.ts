@@ -29,6 +29,8 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export type ExpenseStatus = "unfunded" | "partially_funded" | "funded" | "partially_paid" | "paid" | "overdue" | "cancelled";
 export type ExpensePaymentStatus = "unfunded" | "partially_funded" | "funded" | "paid" | "overdue" | "cancelled";
 export type VendorPayoutStatus = "missing" | "pending" | "verified";
+export type AgreementStatus = "draft" | "awaiting_acceptance" | "active" | "declined" | "cancelled" | "completed";
+export type InvoiceStatus = "prepared" | "issued" | "confirmed" | "paid" | "voided";
 export type PaymentOperationalStatus = "needs_funding" | "partially_funded" | "payout_setup_needed" | "ready_to_pay" | "overdue" | "processing" | "paid" | "cancelled";
 
 export interface PactUser {
@@ -79,13 +81,54 @@ export interface Expense {
   eventId: string;
   title: string;
   category: ExpenseCategory;
-  vendorName: string;
+  payeeName?: string;
+  payeeEmail?: string;
+  /** Legacy read compatibility. New records only write payee fields. */
+  vendorName?: string;
   vendorEmail?: string;
   vendorPayoutStatus?: VendorPayoutStatus;
   totalAmount: number;
   cancelledAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Payee {
+  id: string; eventId: string; name: string; email: string; userId?: string; createdAt: string; updatedAt: string;
+}
+
+export interface AgreementScheduleItem { paymentId: string; label: string; amountMinor: number; dueDate?: string; }
+export interface AgreementSnapshot {
+  agreementId: string; eventId: string; eventName: string; organizerUserId: string; organizerDisplayName: string;
+  expenseId: string; title: string; category: ExpenseCategory; payeeName: string; payeeEmail: string;
+  totalAmountMinor: number; currency: DisplayCurrency; paymentSchedule: AgreementScheduleItem[];
+  termsVersion: string; terms: string;
+}
+
+export interface PaymentAgreement {
+  id: string; eventId: string; expenseId: string; organizerUserId: string; payeeId: string; payeeEmail: string; payeeUserId?: string;
+  totalAmountMinor: number; currency: DisplayCurrency; status: AgreementStatus; snapshot: AgreementSnapshot;
+  agreementHash: string; scheduleHash: string; organizerAddress?: string; payeeAddress?: string;
+  organizerSignature?: string; payeeSignature?: string; onchainAgreementId?: string; onchainTxHash?: string;
+  registrationStatus: "not_started" | "acceptance_signed" | "pending" | "registered" | "retryable_failure";
+  acceptedAt?: string; declinedAt?: string; cancelledAt?: string; createdAt: string; updatedAt: string;
+}
+
+export interface InvoiceSnapshot {
+  invoiceNumber: string; direction: "receivable" | "payable"; issuerName: string; issuerEmail?: string;
+  recipientName: string; recipientEmail?: string; description: string; amountMinor: number; currency: DisplayCurrency;
+  agreementReference?: string; schedule: AgreementScheduleItem[]; issuedOn: string;
+}
+
+export interface Invoice {
+  id: string; eventId: string; direction: "receivable" | "payable"; fundingSourceId?: string; agreementId?: string;
+  invoiceNumber: string; snapshot: InvoiceSnapshot; amountMinor: number; currency: DisplayCurrency; status: InvoiceStatus;
+  documentHash: string; confirmedAt?: string; paidAt?: string; createdAt: string; updatedAt: string;
+}
+
+export interface PayoutProfile {
+  userId: string; signingAddress: string; payoutType: "mera" | "external_wallet"; payoutAddress: string;
+  verificationStatus: "pending" | "verified"; verifiedAt?: string;
 }
 
 export interface ExpensePayment {
@@ -104,5 +147,5 @@ export interface ExpensePayment {
 }
 
 export type ExpensePaymentInput = Pick<ExpensePayment, "label" | "amount" | "dueDate" | "fundedAmount" | "paidAmount"> & { id?: string };
-export type ExpenseInput = Pick<Expense, "title" | "category" | "vendorName" | "vendorEmail" | "totalAmount"> & { payments: ExpensePaymentInput[] };
+export type ExpenseInput = Pick<Expense, "title" | "category" | "totalAmount"> & { payeeName: string; payeeEmail: string; payments: ExpensePaymentInput[] };
 export type ExpenseRecord = { expense: Expense; payments: ExpensePayment[] };

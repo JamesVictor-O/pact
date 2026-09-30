@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, Check, CircleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getPaymentDueLabel, getPaymentFundingGap, getPaymentOperationalStatus, getPaymentReadiness, getVendorPayoutStatus, PAYMENT_OPERATIONAL_STATUS_LABELS, VENDOR_PAYOUT_STATUS_LABELS } from "../../../../../lib/expenses";
 import { formatEventCurrency } from "../../../../../lib/funding";
-import { expenseRepository } from "../../../../../lib/pact-storage";
+import { agreementRepository, expenseRepository, invoiceRepository, payoutRepository } from "../../../../../lib/pact-storage";
 import type { ExpensePayment, ExpenseRecord } from "../../../../../lib/pact-types";
 import { useCurrentEvent } from "../../EventShell";
 
@@ -30,7 +30,8 @@ export default function PaymentDetail({ paymentId }: { paymentId: string }) {
 
   const item = { expense: record.expense, payment };
   const operationalStatus = getPaymentOperationalStatus(item);
-  const readiness = getPaymentReadiness(item);
+  const agreement = agreementRepository.findByExpense(record.expense.id) ?? undefined; const invoice = agreement ? invoiceRepository.findByAgreement(agreement.id) ?? undefined : undefined; const payout = agreement?.payeeUserId ? payoutRepository.findByUser(agreement.payeeUserId) ?? undefined : undefined;
+  const readiness = getPaymentReadiness(item, { agreement, invoice, payout });
   const due = getPaymentDueLabel(payment.dueDate);
   const gap = getPaymentFundingGap(payment);
   const payoutStatus = getVendorPayoutStatus(record.expense);

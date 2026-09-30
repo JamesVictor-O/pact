@@ -5,20 +5,23 @@ import { ArrowLeft, ArrowRight, LoaderCircle, Plus, Trash2 } from "lucide-react"
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EXPENSE_CATEGORY_LABELS } from "../../../../lib/expenses";
-import { expenseRepository } from "../../../../lib/pact-storage";
+import { getPayeeEmail, getPayeeName } from "../../../../lib/agreements";
+import { pactAccountAdapter } from "../../../../lib/pact-account-adapter";
+import { agreementRepository, expenseRepository } from "../../../../lib/pact-storage";
 import { EXPENSE_CATEGORIES, type ExpenseCategory, type ExpensePaymentInput, type ExpenseRecord } from "../../../../lib/pact-types";
 import { useCurrentEvent } from "../EventShell";
+import { usePactAuth } from "../../../components/PactAuthProvider";
 
 type ScheduleType = "single" | "deposit" | "custom";
 type PaymentValue = { key: string; id?: string; label: string; amount: string; dueDate: string; fundedAmount: number; paidAmount: number };
-type FormValues = { title: string; vendorName: string; vendorEmail: string; category: ExpenseCategory | ""; totalAmount: string; scheduleType: ScheduleType; payments: PaymentValue[] };
-type FieldErrors = Partial<Record<"title" | "vendorName" | "vendorEmail" | "category" | "totalAmount" | "schedule", string>>;
+type FormValues = { title: string; payeeName: string; payeeEmail: string; category: ExpenseCategory | ""; totalAmount: string; scheduleType: ScheduleType; payments: PaymentValue[] };
+type FieldErrors = Partial<Record<"title" | "payeeName" | "payeeEmail" | "category" | "totalAmount" | "schedule", string>>;
 
 function key() { return `row_${Math.random().toString(36).slice(2)}`; }
 function parseAmount(value: string) { return Number(value.replace(/,/g, "").trim()); }
 function amountString(value: number) { return value > 0 ? String(value) : ""; }
 function newPayment(label = "Payment", amount = ""): PaymentValue { return { key: key(), label, amount, dueDate: "", fundedAmount: 0, paidAmount: 0 }; }
-const emptyValues: FormValues = { title: "", vendorName: "", vendorEmail: "", category: "", totalAmount: "", scheduleType: "single", payments: [newPayment()] };
+const emptyValues: FormValues = { title: "", payeeName: "", payeeEmail: "", category: "", totalAmount: "", scheduleType: "single", payments: [newPayment()] };
 
 function inferSchedule(record: ExpenseRecord): ScheduleType {
   if (record.payments.length === 1) return "single";
@@ -27,15 +30,15 @@ function inferSchedule(record: ExpenseRecord): ScheduleType {
 }
 
 function fromRecord(record: ExpenseRecord): FormValues {
-  return { title: record.expense.title, vendorName: record.expense.vendorName, vendorEmail: record.expense.vendorEmail ?? "", category: record.expense.category, totalAmount: String(record.expense.totalAmount), scheduleType: inferSchedule(record), payments: record.payments.map((payment) => ({ key: key(), id: payment.id, label: payment.label, amount: String(payment.amount), dueDate: payment.dueDate ?? "", fundedAmount: payment.fundedAmount, paidAmount: payment.paidAmount })) };
+  return { title: record.expense.title, payeeName: getPayeeName(record.expense), payeeEmail: getPayeeEmail(record.expense), category: record.expense.category, totalAmount: String(record.expense.totalAmount), scheduleType: inferSchedule(record), payments: record.payments.map((payment) => ({ key: key(), id: payment.id, label: payment.label, amount: String(payment.amount), dueDate: payment.dueDate ?? "", fundedAmount: payment.fundedAmount, paidAmount: payment.paidAmount })) };
 }
 
 function validate(values: FormValues): FieldErrors {
   const errors: FieldErrors = {};
   const total = parseAmount(values.totalAmount);
   if (!values.title.trim()) errors.title = "Enter what the event is paying for.";
-  if (!values.vendorName.trim()) errors.vendorName = "Enter the vendor name.";
-  if (values.vendorEmail.trim() && !/^\S+@\S+\.\S+$/.test(values.vendorEmail.trim())) errors.vendorEmail = "Enter a valid vendor email address.";
+  if (!values.payeeName.trim()) errors.payeeName = "Enter who the event is paying.";
+  if (!/^\S+@\S+\.\S+$/.test(values.payeeEmail.trim())) errors.payeeEmail = "Enter the payee’s verified email address.";
   if (!values.category) errors.category = "Choose an expense category.";
   if (!values.totalAmount.trim() || !Number.isFinite(total) || total <= 0) errors.totalAmount = "Enter a total amount greater than zero.";
   if (values.payments.length === 0 || values.payments.some((payment) => !payment.label.trim() || !payment.amount.trim() || !Number.isFinite(parseAmount(payment.amount)) || parseAmount(payment.amount) <= 0)) errors.schedule = "Every payment needs a label and an amount greater than zero.";
@@ -55,6 +58,7 @@ function validate(values: FormValues): FieldErrors {
 
 export default function ExpenseForm({ expenseId }: { expenseId?: string }) {
   const event = useCurrentEvent();
+  const { user } = usePactAuth();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [values, setValues] = useState<FormValues>(emptyValues);
@@ -78,8 +82,15 @@ export default function ExpenseForm({ expenseId }: { expenseId?: string }) {
     setStatus("submitting"); setSubmitError("");
     try {
       const payments: ExpensePaymentInput[] = values.payments.map((payment) => ({ id: payment.id, label: payment.label.trim(), amount: parseAmount(payment.amount), dueDate: payment.dueDate || undefined, fundedAmount: payment.fundedAmount, paidAmount: payment.paidAmount }));
-      const input = { title: values.title.trim(), vendorName: values.vendorName.trim(), vendorEmail: values.vendorEmail.trim() || undefined, category: values.category as ExpenseCategory, totalAmount: parseAmount(values.totalAmount), payments };
+      const input = { title: values.title.trim(), payeeName: values.payeeName.trim(), payeeEmail: values.payeeEmail.trim(), category: values.category as ExpenseCategory, totalAmount: parseAmount(values.totalAmount), payments };
       const saved = expenseId ? expenseRepository.update(expenseId, input) : expenseRepository.create(event.id, input); if (!saved) throw new Error("Expense not found");
+      if (!expenseId) {
+        if (!user) throw new Error("Authentication required");
+        const agreement = agreementRepository.findByExpense(saved.expense.id); if (!agreement) throw new Error("Agreement not found");
+        if (!pactAccountAdapter.hasAccount()) await pactAccountAdapter.setup(user);
+        const signed = await pactAccountAdapter.signProposal({ agreementId: agreement.id, eventId: agreement.eventId, agreementHash: agreement.agreementHash as `0x${string}`, scheduleHash: agreement.scheduleHash as `0x${string}`, currency: agreement.currency, totalAmountMinor: agreement.totalAmountMinor });
+        if (!agreementRepository.finalizeProposal(agreement.id, signed.address, signed.signature)) throw new Error("Proposal was not finalized");
+      }
       router.replace(`/events/${event.id}/expenses/${saved.expense.id}?${expenseId ? "updated" : "created"}=1`);
     } catch { setStatus("idle"); setSubmitError("We couldn’t save this expense. Your details are still here—please try again."); }
   }
@@ -91,14 +102,14 @@ export default function ExpenseForm({ expenseId }: { expenseId?: string }) {
   return <div className="funding-form-page expense-form-page"><Link className="app-back-link" href={expenseId ? `/events/${event.id}/expenses/${expenseId}` : `/events/${event.id}/expenses`}><ArrowLeft aria-hidden="true" /> Back to expenses</Link><header><p className="app-eyebrow">{expenseId ? "Edit expense" : "New expense"}</p><h1>{expenseId ? "Update the expense" : "Add an expense"}</h1><p>Record what your event needs to pay and how the payment is scheduled.</p></header>
     <form ref={formRef} className="funding-source-form expense-form" onSubmit={submit} noValidate aria-busy={status === "submitting"}>
       <section className="expense-form-section" aria-labelledby="expense-details-heading"><h2 id="expense-details-heading">Expense details</h2><div className="form-field"><label htmlFor="title">What are you paying for? <span>Required</span></label><input id="title" type="text" placeholder="Production" value={values.title} onChange={(e) => setField("title", e.target.value)} onBlur={() => setErrors((current) => ({ ...current, title: validate(values).title }))} aria-invalid={errors.title ? "true" : undefined} aria-describedby={errors.title ? "title-error" : undefined} />{errors.title && <p id="title-error" className="field-error">{errors.title}</p>}</div>
-      <div className="form-row"><div className="form-field"><label htmlFor="vendorName">Vendor <span>Required</span></label><input id="vendorName" autoComplete="organization" placeholder="Pixel Production Ltd." value={values.vendorName} onChange={(e) => setField("vendorName", e.target.value)} aria-invalid={errors.vendorName ? "true" : undefined} aria-describedby={errors.vendorName ? "vendorName-error" : undefined} />{errors.vendorName && <p id="vendorName-error" className="field-error">{errors.vendorName}</p>}</div><div className="form-field"><label htmlFor="vendorEmail">Vendor email <span>Optional</span></label><input id="vendorEmail" type="email" autoComplete="email" spellCheck={false} placeholder="payments@example.com" value={values.vendorEmail} onChange={(e) => setField("vendorEmail", e.target.value)} aria-invalid={errors.vendorEmail ? "true" : undefined} aria-describedby={errors.vendorEmail ? "vendorEmail-error" : undefined} />{errors.vendorEmail && <p id="vendorEmail-error" className="field-error">{errors.vendorEmail}</p>}</div></div>
+      <div className="form-row"><div className="form-field"><label htmlFor="payeeName">Who are you paying? <span>Required</span></label><input id="payeeName" autoComplete="organization" placeholder="James Lmd or Pixel Production" value={values.payeeName} onChange={(e) => setField("payeeName", e.target.value)} aria-invalid={errors.payeeName ? "true" : undefined} aria-describedby={errors.payeeName ? "payeeName-error" : undefined} />{errors.payeeName && <p id="payeeName-error" className="field-error">{errors.payeeName}</p>}</div><div className="form-field"><label htmlFor="payeeEmail">Email <span>Required</span></label><input id="payeeEmail" type="email" autoComplete="email" spellCheck={false} placeholder="james@example.com" value={values.payeeEmail} onChange={(e) => setField("payeeEmail", e.target.value)} aria-invalid={errors.payeeEmail ? "true" : undefined} aria-describedby={errors.payeeEmail ? "payeeEmail-error" : undefined} />{errors.payeeEmail && <p id="payeeEmail-error" className="field-error">{errors.payeeEmail}</p>}</div></div>
       <div className="form-row"><div className="form-field"><label htmlFor="category">Category <span>Required</span></label><select id="category" value={values.category} onChange={(e) => setField("category", e.target.value)} aria-invalid={errors.category ? "true" : undefined} aria-describedby={errors.category ? "category-error" : undefined}><option value="">Select a category</option>{EXPENSE_CATEGORIES.map((category) => <option value={category} key={category}>{EXPENSE_CATEGORY_LABELS[category]}</option>)}</select>{errors.category && <p id="category-error" className="field-error">{errors.category}</p>}</div><div className="form-field"><label htmlFor="totalAmount">Total amount <span>Required</span></label><div className="currency-input"><span>{event.displayCurrency}</span><input id="totalAmount" type="text" inputMode="decimal" placeholder="8,000" value={values.totalAmount} onChange={(e) => changeTotal(e.target.value)} aria-invalid={errors.totalAmount ? "true" : undefined} aria-describedby={errors.totalAmount ? "totalAmount-error" : undefined} /></div>{errors.totalAmount && <p id="totalAmount-error" className="field-error">{errors.totalAmount}</p>}</div></div></section>
 
       <section className="expense-form-section schedule-section" aria-labelledby="schedule-heading"><div className="expense-section-heading"><div><h2 id="schedule-heading">How will this be paid?</h2><p>The schedule must add up to the expense total.</p></div></div><fieldset className="schedule-type-fieldset"><legend className="sr-only">Payment schedule type</legend><div className="schedule-type-grid">{(["single", "deposit", "custom"] as const).map((type) => <label className={values.scheduleType === type ? "selected" : ""} key={type}><input type="radio" name="scheduleType" checked={values.scheduleType === type} onChange={() => changeSchedule(type)} /><span>{type === "single" ? "Single payment" : type === "deposit" ? "Deposit + balance" : "Custom payment schedule"}</span></label>)}</div></fieldset>
       <div className="payment-editor" id="schedule" tabIndex={errors.schedule ? -1 : undefined}>{values.payments.map((payment, index) => <div className="payment-editor-row" key={payment.key}><div className="form-field"><label htmlFor={`payment-label-${index}`}>Payment name</label><input id={`payment-label-${index}`} type="text" value={payment.label} onChange={(e) => updatePayment(index, "label", e.target.value)} readOnly={values.scheduleType === "deposit"} /></div><div className="form-field"><label htmlFor={`payment-amount-${index}`}>Amount</label><div className="currency-input"><span>{event.displayCurrency}</span><input id={`payment-amount-${index}`} type="text" inputMode="decimal" value={payment.amount} onChange={(e) => updatePayment(index, "amount", e.target.value)} readOnly={values.scheduleType === "deposit" && index === 1} /></div></div><div className="form-field"><label htmlFor={`payment-date-${index}`}>Due date <span>Optional</span></label><input id={`payment-date-${index}`} type="date" value={payment.dueDate} onChange={(e) => updatePayment(index, "dueDate", e.target.value)} /></div>{values.scheduleType === "custom" && <button className="remove-payment" type="button" onClick={() => removePayment(index)} disabled={values.payments.length === 1} aria-label={`Remove ${payment.label || `payment ${index + 1}`}`}><Trash2 aria-hidden="true" /></button>}</div>)}</div>
       {values.scheduleType === "custom" && <button className="add-payment-button" type="button" onClick={addPayment}><Plus aria-hidden="true" /> Add payment</button>}
       <div className="schedule-totals"><span><small>Schedule total</small><strong>{event.displayCurrency} {scheduleTotal.toLocaleString()}</strong></span><span><small>Expense total</small><strong>{event.displayCurrency} {(parseAmount(values.totalAmount) || 0).toLocaleString()}</strong></span></div>{errors.schedule && <p className="form-submit-error" role="alert">{errors.schedule}</p>}</section>
-      {submitError && <p className="form-submit-error" role="alert">{submitError}</p>}<div className="funding-form-actions"><Link className="app-secondary-button" href={expenseId ? `/events/${event.id}/expenses/${expenseId}` : `/events/${event.id}/expenses`}>Cancel</Link><button className="app-primary-button" type="submit" disabled={status === "submitting"}>{status === "submitting" ? <><LoaderCircle className="button-spinner" aria-hidden="true" /> Saving…</> : <>{expenseId ? "Save changes" : "Add expense"}<ArrowRight aria-hidden="true" /></>}</button></div>
+      {submitError && <p className="form-submit-error" role="alert">{submitError}</p>}<div className="funding-form-actions"><Link className="app-secondary-button" href={expenseId ? `/events/${event.id}/expenses/${expenseId}` : `/events/${event.id}/expenses`}>Cancel</Link><button className="app-primary-button" type="submit" disabled={status === "submitting"}>{status === "submitting" ? <><LoaderCircle className="button-spinner" aria-hidden="true" /> Saving…</> : <>{expenseId ? "Save changes" : "Create payment agreement"}<ArrowRight aria-hidden="true" /></>}</button></div>
     </form>
   </div>;
 }

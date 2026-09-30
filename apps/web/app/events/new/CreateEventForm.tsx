@@ -104,7 +104,7 @@ export default function CreateEventForm() {
   return <main className="app-standalone">
     <AppTopbar userName={user?.name} compact />
     <div className="form-page-shell">
-      <div className="form-page-intro"><p className="app-eyebrow">New event workspace</p><h1>Create your Pact</h1><p>Start with the basics. You can add funding, vendors, and payment schedules next.</p></div>
+      <div className="form-page-intro"><p className="app-eyebrow">New event workspace</p><h1>Create your Pact</h1><p>Start with the basics. You can add funding, payees, and payment schedules next.</p></div>
       <form ref={formRef} className="create-event-form" onSubmit={submit} noValidate aria-busy={status === "submitting"}>
         <div className="form-field">
           <label htmlFor="name">Event name <span>Required</span></label>

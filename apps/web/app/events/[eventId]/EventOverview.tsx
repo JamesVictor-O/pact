@@ -31,7 +31,7 @@ export default function EventOverview() {
   const summary = [
     { label: "Estimated budget", value: formatEventCurrency(event.estimatedBudget, event.displayCurrency), note: "Working plan" },
     { label: "Funding received", value: formatEventCurrency(funding.received, event.displayCurrency), note: funding.received > 0 ? `${formatEventCurrency(funding.stillExpected, event.displayCurrency)} still expected` : "No funding received" },
-    { label: "Committed to vendors", value: formatEventCurrency(expenseSummary.totalCommitted, event.displayCurrency), note: expenseSummary.totalCommitted > 0 ? `${formatEventCurrency(expenseSummary.unfunded, event.displayCurrency)} unfunded` : "No expenses added" },
+    { label: "Committed to payees", value: formatEventCurrency(expenseSummary.totalCommitted, event.displayCurrency), note: expenseSummary.totalCommitted > 0 ? `${formatEventCurrency(expenseSummary.unfunded, event.displayCurrency)} unfunded` : "No expenses added" },
     { label: "Available", value: formatEventCurrency(funding.available, event.displayCurrency), note: "Received minus allocated" },
   ];
 
@@ -48,7 +48,7 @@ export default function EventOverview() {
       <div className="first-run-copy"><p className="app-eyebrow">Your first financial actions</p><h2 id="first-run-heading">Start building your event finances</h2><p>Track where your money is coming from and what your event needs to pay.</p></div>
       <div className="first-action-grid">
         <Link href={`/events/${event.id}/funding/new`} className="first-action first-action-primary"><span><CircleDollarSign aria-hidden="true" /></span><div><strong>Add funding</strong><p>Add a sponsor commitment or another expected source.</p></div><ArrowRight aria-hidden="true" /></Link>
-        <Link href={`/events/${event.id}/expenses/new`} className="first-action"><span><ReceiptText aria-hidden="true" /></span><div><strong>Add expense</strong><p>Record a vendor cost, amount, and due date.</p></div><ArrowRight aria-hidden="true" /></Link>
+        <Link href={`/events/${event.id}/expenses/new`} className="first-action"><span><ReceiptText aria-hidden="true" /></span><div><strong>Add expense</strong><p>Record who needs to be paid, the amount, and due date.</p></div><ArrowRight aria-hidden="true" /></Link>
       </div>
     </section>
 

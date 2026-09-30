@@ -40,7 +40,8 @@ test("operational status keeps overdue separate from funding and payout readines
   assert.equal(getPaymentOperationalStatus(overdue, today), "overdue");
   assert.equal(getPaymentReadiness(overdue).ready, false);
   const verified = { ...overdue, expense: { ...overdue.expense, vendorPayoutStatus: "verified" as const } };
-  assert.equal(getPaymentReadiness(verified).ready, true);
+  const context = { agreement: { status: "active" }, invoice: { status: "confirmed" }, payout: { verificationStatus: "verified" } } as any;
+  assert.equal(getPaymentReadiness(verified, context).ready, true);
   assert.equal(getPaymentOperationalStatus(verified, today), "overdue");
 });
 
@@ -50,7 +51,8 @@ test("payment position uses active schedules as its single source", () => {
     payment({ fundedAmount: 3_000 }),
     payment({ id: "payment_2", amount: 2_000, dueDate: undefined, fundedAmount: 500, paidAmount: 250 }),
   ], { vendorPayoutStatus: "verified" });
-  const summary = getPaymentSummary([active], 30, today);
+  const context = { agreement: { status: "active" }, invoice: { status: "confirmed" }, payout: { verificationStatus: "verified" } } as any;
+  const summary = getPaymentSummary([active], 30, today, () => context);
   assert.deepEqual(summary, { dueSoon: 3_000, readyToPay: 3_000, fundingGap: 1_500, paidToDate: 250 });
   const cancelledAfterPayment = record([payment({ paidAmount: 1_000 })], { cancelledAt: "2026-09-20T00:00:00.000Z" });
   assert.equal(getPaymentSummary([cancelledAfterPayment], 30, today).paidToDate, 1_000);

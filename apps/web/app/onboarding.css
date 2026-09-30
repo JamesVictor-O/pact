@@ -367,6 +367,65 @@
 .payment-allocation-note { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .payment-source-expense .app-secondary-button { white-space: nowrap; }
 
+/* Payee agreements and invoices */
+.agreement-shell, .invoice-page { min-height: 100svh; background: var(--canvas); }
+.agreement-topbar { width: min(1040px, calc(100% - 64px)); min-height: 84px; margin-inline: auto; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; }
+.agreement-topbar img { display: block; }
+.agreement-content, .agreement-review, .invoice-actions, .invoice-document { width: min(820px, calc(100% - 64px)); margin-inline: auto; }
+.agreement-content { padding-block: 72px 112px; }
+.agreement-content h1, .agreement-review h1, .agreement-success h1 { font-size: clamp(34px, 5vw, 48px); line-height: 1.08; letter-spacing: -.04em; }
+.agreement-lede, .agreement-review > header > p:last-child { margin-top: 14px; color: var(--muted); }
+.agreement-group { margin-top: 52px; }
+.agreement-group h2 { font-size: 18px; }
+.agreement-row { min-height: 88px; padding-block: 18px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto 20px; align-items: center; gap: 24px; }
+.agreement-row:first-of-type { margin-top: 14px; border-top: 1px solid var(--line); }
+.agreement-row > span { display: grid; gap: 4px; }
+.agreement-row > span:nth-child(2) { text-align: right; }
+.agreement-row small { color: var(--muted); font-size: 11px; }
+.agreement-row svg { width: 16px; height: 16px; }
+.agreement-empty, .agreement-success { min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.agreement-empty > svg, .agreement-success > svg { width: 48px; height: 48px; margin-bottom: 24px; padding: 12px; border-radius: 50%; background: var(--mint); color: var(--success); }
+.agreement-empty p, .agreement-success p { max-width: 460px; margin-top: 8px; color: var(--muted); }
+.agreement-success .app-primary-button { margin-top: 24px; }
+.agreement-review { padding-block: 40px 112px; }
+.agreement-review > header { margin-top: 28px; }
+.agreement-review > section, .agreement-review > form { margin-top: 32px; padding: 28px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.agreement-review section h2 { font-size: 22px; }
+.agreement-review section h3 { margin-top: 28px; font-size: 14px; }
+.agreement-facts { margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.agreement-facts div, .agreement-schedule span { display: grid; gap: 4px; }
+.agreement-facts dt, .agreement-schedule small { color: var(--muted); font-size: 10px; }
+.agreement-facts dd { margin: 0; font-size: 14px; font-weight: 600; }
+.agreement-schedule { margin-top: 12px; border-top: 1px solid var(--line); }
+.agreement-schedule > div { min-height: 64px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.agreement-terms { margin-top: 24px; color: var(--muted); font-size: 12px; }
+.agreement-review > section > .app-secondary-button { margin-top: 20px; }
+.secure-account-note { display: flex; gap: 14px; margin-bottom: 24px; }
+.secure-account-note > svg { color: var(--success); }
+.secure-account-note span { display: grid; }
+.secure-account-note small { color: var(--muted); }
+.agreement-check { min-height: 48px; padding-block: 10px; display: flex; align-items: flex-start; gap: 12px; font-size: 12px; }
+.agreement-check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.agreement-review form .app-primary-button { width: 100%; margin-top: 20px; }
+.invoice-actions { padding-block: 32px; display: flex; align-items: center; justify-content: space-between; }
+.invoice-document { margin-bottom: 80px; padding: 48px; border: 1px solid var(--line); background: var(--surface); }
+.invoice-document > header { display: flex; align-items: flex-start; justify-content: space-between; }
+.invoice-document > header > span { font-size: 24px; font-weight: 600; letter-spacing: .08em; }
+.invoice-document > header > div { text-align: right; }
+.invoice-parties { margin-top: 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.invoice-parties section, .invoice-description { display: grid; gap: 4px; }
+.invoice-document p, .invoice-document span { color: var(--muted); font-size: 11px; }
+.invoice-description { margin-top: 36px; }
+.invoice-lines { margin-top: 40px; border-block: 1px solid var(--line); }
+.invoice-lines > div { min-height: 54px; display: grid; grid-template-columns: 1fr .7fr .6fr; align-items: center; gap: 16px; border-top: 1px solid var(--line); }
+.invoice-lines > div:first-child { min-height: 40px; border-top: 0; color: var(--muted); font-size: 10px; }
+.invoice-lines > div > :last-child { text-align: right; }
+.invoice-document footer { margin-top: 32px; display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+.invoice-document footer span { max-width: 430px; }
+.invoice-document footer strong { font-size: 22px; }
+
+@media print { .invoice-actions { display: none; } .invoice-page { background: white; } .invoice-document { width: 100%; margin: 0; border: 0; } }
+
 @media (prefers-reduced-motion: no-preference) {
   .app-primary-button, .app-secondary-button, .auth-provider-button, .app-nav a, .first-action, .event-list-row { transition: transform 150ms cubic-bezier(.2,.8,.2,1), border-color 150ms cubic-bezier(.2,.8,.2,1), background-color 150ms cubic-bezier(.2,.8,.2,1); }
   .app-primary-button:hover, .auth-provider-button:hover:not(:disabled), .first-action:hover { transform: translateY(-1px); }
@@ -487,4 +546,17 @@
   .payment-funding-panel > div { flex-direction: column; }
   .payment-source-expense { align-items: stretch; }
   .payment-source-expense .app-secondary-button { width: 100%; justify-content: center; }
+  .agreement-topbar, .agreement-content, .agreement-review, .invoice-actions, .invoice-document { width: calc(100% - 32px); }
+  .agreement-topbar { min-height: 72px; }
+  .agreement-content { padding-block: 48px 72px; }
+  .agreement-row { grid-template-columns: 1fr 16px; }
+  .agreement-row > span:nth-child(2) { grid-column: 1; grid-row: 2; text-align: left; }
+  .agreement-row > svg { grid-column: 2; grid-row: 1 / 3; }
+  .agreement-review > section, .agreement-review > form { padding: 22px 18px; border-radius: 22px; }
+  .agreement-facts, .invoice-parties { grid-template-columns: 1fr; }
+  .invoice-actions { align-items: stretch; flex-direction: column; gap: 12px; }
+  .invoice-document { padding: 28px 20px; }
+  .invoice-lines > div { grid-template-columns: 1fr .7fr; }
+  .invoice-lines > div > :nth-child(2) { display: none; }
+  .invoice-document footer { align-items: flex-start; flex-direction: column; }
 }

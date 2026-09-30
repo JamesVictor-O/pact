@@ -1,4 +1,6 @@
 import type { Expense, ExpenseCategory, ExpensePayment, ExpensePaymentStatus, ExpenseRecord, ExpenseStatus, PaymentOperationalStatus, VendorPayoutStatus } from "./pact-types";
+import { getAgreementPaymentReadiness } from "./agreements.ts";
+import type { Invoice, PaymentAgreement, PayoutProfile } from "./pact-types";
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   venue: "Venue", production: "Production", catering: "Catering", security: "Security", travel: "Travel",
@@ -64,19 +66,11 @@ export function getPaymentOperationalStatus(item: EventPayment, today = new Date
   return "needs_funding";
 }
 
-export function getPaymentReadiness(item: EventPayment): { ready: boolean; reasons: string[] } {
+export type PaymentReadinessContext = { agreement?: PaymentAgreement; invoice?: Invoice; payout?: PayoutProfile };
+export function getPaymentReadiness(item: EventPayment, context: PaymentReadinessContext = {}): { ready: boolean; reasons: string[] } {
   const { expense, payment } = item;
-  const reasons: string[] = [];
-  if (expense.cancelledAt || payment.cancelledAt) reasons.push("This scheduled payment is cancelled.");
-  else if (payment.paidAmount >= payment.amount) reasons.push("This payment has already been released to the vendor.");
-  else if (payment.processingStartedAt) reasons.push("This payment is already being processed.");
-  if (!expense.cancelledAt && !payment.cancelledAt && payment.paidAmount < payment.amount && payment.fundedAmount < payment.amount) {
-    reasons.push(`${Math.max(payment.amount - payment.fundedAmount, 0)} still needs funding.`);
-  }
-  if (!expense.cancelledAt && !payment.cancelledAt && payment.paidAmount < payment.amount && getVendorPayoutStatus(expense) !== "verified") {
-    reasons.push(getVendorPayoutStatus(expense) === "pending" ? "Vendor payout setup is still pending verification." : "Vendor payout details are not configured.");
-  }
-  return { ready: reasons.length === 0, reasons };
+  if (payment.processingStartedAt) return { ready: false, reasons: ["This payment is already being processed."] };
+  return getAgreementPaymentReadiness(payment.amount, payment.fundedAmount, payment.paidAmount, Boolean(expense.cancelledAt || payment.cancelledAt), context.agreement, context.invoice, context.payout);
 }
 
 export function getExpenseFundedAmount(record: ExpenseRecord): number {
@@ -135,26 +129,26 @@ export function getOverduePayments(records: ExpenseRecord[], today = new Date())
   return getEventPayments(records).filter((item) => getPaymentOperationalStatus(item, today) === "overdue");
 }
 
-export function getReadyToPayPayments(records: ExpenseRecord[]): EventPayment[] {
-  return getEventPayments(records).filter((item) => getPaymentReadiness(item).ready);
+export function getReadyToPayPayments(records: ExpenseRecord[], resolve: (expenseId: string) => PaymentReadinessContext = () => ({})): EventPayment[] {
+  return getEventPayments(records).filter((item) => getPaymentReadiness(item, resolve(item.expense.id)).ready);
 }
 
-export function filterEventPayments(items: EventPayment[], filter: PaymentFilter, today = new Date()): EventPayment[] {
+export function filterEventPayments(items: EventPayment[], filter: PaymentFilter, today = new Date(), resolve: (expenseId: string) => PaymentReadinessContext = () => ({})): EventPayment[] {
   const todayValue = localDateValue(today);
   return items.filter((item) => {
     const status = getPaymentOperationalStatus(item, today);
     if (filter === "attention") return status === "overdue" || status === "needs_funding" || status === "partially_funded" || status === "payout_setup_needed";
-    if (filter === "ready") return getPaymentReadiness(item).ready;
+    if (filter === "ready") return getPaymentReadiness(item, resolve(item.expense.id)).ready;
     if (filter === "upcoming") return !item.expense.cancelledAt && !item.payment.cancelledAt && item.payment.paidAmount < item.payment.amount && Boolean(item.payment.dueDate && item.payment.dueDate >= todayValue);
     if (filter === "paid") return status === "paid";
     return true;
   });
 }
 
-export function getPaymentSummary(records: ExpenseRecord[], days = 30, today = new Date()) {
+export function getPaymentSummary(records: ExpenseRecord[], days = 30, today = new Date(), resolve: (expenseId: string) => PaymentReadinessContext = () => ({})) {
   const activeUnpaid = getEventPayments(records).filter(({ expense, payment }) => !expense.cancelledAt && !payment.cancelledAt && payment.paidAmount < payment.amount);
   const dueSoon = getUpcomingPayments(records, days, today).reduce((total, { payment }) => total + Math.max(payment.amount - payment.paidAmount, 0), 0);
-  const readyToPay = activeUnpaid.filter((item) => getPaymentReadiness(item).ready).reduce((total, { payment }) => total + Math.max(payment.amount - payment.paidAmount, 0), 0);
+  const readyToPay = activeUnpaid.filter((item) => getPaymentReadiness(item, resolve(item.expense.id)).ready).reduce((total, { payment }) => total + Math.max(payment.amount - payment.paidAmount, 0), 0);
   const fundingGap = activeUnpaid.reduce((total, { payment }) => total + getPaymentFundingGap(payment), 0);
   // Cancelling an expense stops future obligations, but must not erase money already released.
   const paidToDate = getEventPayments(records).filter(({ payment }) => !payment.cancelledAt).reduce((total, { payment }) => total + Math.min(payment.paidAmount, payment.amount), 0);
