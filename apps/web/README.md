@@ -9,3 +9,12 @@ To enable authentication, copy `apps/web/.env.example` to `apps/web/.env.local` 
 `NEXT_PUBLIC_ENABLE_AUTH_PREVIEW=true` enables the local, unverified preview adapter only when Dynamic is not configured. It should remain disabled in deployed environments.
 
 Dynamic authentication is wired but requires project credentials. Aurora Intents, QR generation, and the public payment route remain unimplemented. The web application must never authoritatively mark a real payment paid.
+
+## Production agreement lifecycle
+
+Apply both SQL migrations in `packages/database/migrations`, then configure the
+PostgreSQL, Dynamic, Monad, registry, and relayer variables in `.env.example`.
+Agreement APIs derive identity and verified email from Dynamic's signed JWT.
+Acceptance moves through `acceptance_signed` and `registration_pending`; it only
+becomes `active` after Monad confirms the canonical registry transaction. Retry
+requests preserve both signatures and reconcile before rebroadcasting.

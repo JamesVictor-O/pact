@@ -5,7 +5,8 @@ import { ArrowRight, CalendarDays, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AppTopbar from "../components/AppTopbar";
-import { agreementRepository, eventRepository } from "../../lib/pact-storage";
+import { eventRepository } from "../../lib/pact-storage";
+import { listAgreements } from "../../lib/agreement-api";
 import type { PactEvent, PactUser } from "../../lib/pact-types";
 import { usePactAuth } from "../components/PactAuthProvider";
 
@@ -34,7 +35,7 @@ export default function DashboardClient() {
     }
     setUser(authenticatedUser);
     setEvents(ownerEvents);
-    setPendingAgreements(agreementRepository.listForEmail(authenticatedUser.email).filter((item) => item.status === "awaiting_acceptance").length);
+    void listAgreements().then(items=>setPendingAgreements(items.filter(item=>item.status==="awaiting_acceptance").length)).catch(()=>setPendingAgreements(0));
     setLoading(false);
   }, [authReady, authenticatedUser, router]);
 

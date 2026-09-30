@@ -5,7 +5,8 @@ import { ArrowLeft, ArrowRight, Check, CircleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getPaymentDueLabel, getPaymentFundingGap, getPaymentOperationalStatus, getPaymentReadiness, getVendorPayoutStatus, PAYMENT_OPERATIONAL_STATUS_LABELS, VENDOR_PAYOUT_STATUS_LABELS } from "../../../../../lib/expenses";
 import { formatEventCurrency } from "../../../../../lib/funding";
-import { agreementRepository, expenseRepository, invoiceRepository, payoutRepository } from "../../../../../lib/pact-storage";
+import { expenseRepository } from "../../../../../lib/pact-storage";
+import { getAgreementByExpense,type AgreementBundle } from "../../../../../lib/agreement-api";
 import type { ExpensePayment, ExpenseRecord } from "../../../../../lib/pact-types";
 import { useCurrentEvent } from "../../EventShell";
 
@@ -13,6 +14,7 @@ export default function PaymentDetail({ paymentId }: { paymentId: string }) {
   const event = useCurrentEvent();
   const [record, setRecord] = useState<ExpenseRecord | null>(null);
   const [payment, setPayment] = useState<ExpensePayment | null>(null);
+  const [bundle,setBundle]=useState<AgreementBundle|null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "missing" | "error">("loading");
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export default function PaymentDetail({ paymentId }: { paymentId: string }) {
       const stored = expenseRepository.findPaymentById(paymentId);
       const storedPayment = stored?.payments.find((item) => item.id === paymentId) ?? null;
       if (!stored || !storedPayment || stored.expense.eventId !== event.id) { setStatus("missing"); return; }
-      setRecord(stored); setPayment(storedPayment); setStatus("ready");
+      setRecord(stored); setPayment(storedPayment);getAgreementByExpense(stored.expense.id).then(setBundle).catch(()=>setBundle(null)); setStatus("ready");
     } catch { setStatus("error"); }
   }, [event.id, paymentId]);
 
@@ -30,7 +32,7 @@ export default function PaymentDetail({ paymentId }: { paymentId: string }) {
 
   const item = { expense: record.expense, payment };
   const operationalStatus = getPaymentOperationalStatus(item);
-  const agreement = agreementRepository.findByExpense(record.expense.id) ?? undefined; const invoice = agreement ? invoiceRepository.findByAgreement(agreement.id) ?? undefined : undefined; const payout = agreement?.payeeUserId ? payoutRepository.findByUser(agreement.payeeUserId) ?? undefined : undefined;
+  const agreement=bundle?.agreement;const invoice=bundle?.invoice??undefined;const payout=bundle?.payout??undefined;
   const readiness = getPaymentReadiness(item, { agreement, invoice, payout });
   const due = getPaymentDueLabel(payment.dueDate);
   const gap = getPaymentFundingGap(payment);

@@ -6,8 +6,9 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EXPENSE_CATEGORY_LABELS } from "../../../../lib/expenses";
 import { getPayeeEmail, getPayeeName } from "../../../../lib/agreements";
+import { createAgreementForExpense, submitProposal } from "../../../../lib/agreement-api";
 import { pactAccountAdapter } from "../../../../lib/pact-account-adapter";
-import { agreementRepository, expenseRepository } from "../../../../lib/pact-storage";
+import { expenseRepository } from "../../../../lib/pact-storage";
 import { EXPENSE_CATEGORIES, type ExpenseCategory, type ExpensePaymentInput, type ExpenseRecord } from "../../../../lib/pact-types";
 import { useCurrentEvent } from "../EventShell";
 import { usePactAuth } from "../../../components/PactAuthProvider";
@@ -86,10 +87,11 @@ export default function ExpenseForm({ expenseId }: { expenseId?: string }) {
       const saved = expenseId ? expenseRepository.update(expenseId, input) : expenseRepository.create(event.id, input); if (!saved) throw new Error("Expense not found");
       if (!expenseId) {
         if (!user) throw new Error("Authentication required");
-        const agreement = agreementRepository.findByExpense(saved.expense.id); if (!agreement) throw new Error("Agreement not found");
-        if (!pactAccountAdapter.hasAccount()) await pactAccountAdapter.setup(user);
-        const signed = await pactAccountAdapter.signProposal({ agreementId: agreement.id, eventId: agreement.eventId, agreementHash: agreement.agreementHash as `0x${string}`, scheduleHash: agreement.scheduleHash as `0x${string}`, currency: agreement.currency, totalAmountMinor: agreement.totalAmountMinor });
-        if (!agreementRepository.finalizeProposal(agreement.id, signed.address, signed.signature)) throw new Error("Proposal was not finalized");
+        const agreement = await createAgreementForExpense(saved, event, user);
+        await pactAccountAdapter.ensureAccount(user);
+        const expiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
+        const signed = await pactAccountAdapter.signProposal(user.email,agreement,expiresAt);
+        await submitProposal(agreement.id,{...signed,expiresAt});
       }
       router.replace(`/events/${event.id}/expenses/${saved.expense.id}?${expenseId ? "updated" : "created"}=1`);
     } catch { setStatus("idle"); setSubmitError("We couldn’t save this expense. Your details are still here—please try again."); }

@@ -5,29 +5,31 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { agreementRepository, authClient, eventRepository, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
+import { authClient, eventRepository, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
+import { listAgreements } from "../../lib/agreement-api";
 import { usePactAuth } from "../components/PactAuthProvider";
 
-export default function AuthEntry() {
+export default function AuthEntry({ intent }: { intent: "organizer" | "payee" }) {
   const router = useRouter();
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
-  const { configured, ready, user, openAuth, sendEmailCode, verifyEmailCode } = usePactAuth();
+  const { configured, ready, user, openAuth, sendEmailCode, verifyEmailCode, signOut } = usePactAuth();
+  const continueAfterAuthentication = useRef(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [formError, setFormError] = useState("");
-  const [pending, setPending] = useState<"google" | "email" | null>(null);
+  const [pending, setPending] = useState<"google" | "email" | "switch" | null>(null);
 
   useEffect(() => {
-    if (user) void finishAuthentication(user);
-  }, [user?.id]);
+    if (user && (intent === "organizer" || continueAfterAuthentication.current)) void finishAuthentication(user);
+  }, [user?.id, intent]);
 
   async function finishAuthentication(user: Awaited<ReturnType<typeof authClient.signInWithEmail>>) {
     const events = eventRepository.listByOwner(user.id);
-    const pendingAgreements = agreementRepository.listForEmail(user.email);
-    const destination = events.length > 0 ? "/dashboard" : pendingAgreements.length > 0 ? "/agreements" : "/events/new";
+    const pendingAgreements = isDynamicAuthConfigured ? await listAgreements().catch(()=>[]) : [];
+    const destination = intent === "payee" ? "/agreements" : events.length > 0 ? "/dashboard" : pendingAgreements.length > 0 ? "/agreements" : "/events/new";
     if (isDynamicAuthConfigured) router.replace(destination);
     else window.location.assign(destination);
   }
@@ -36,6 +38,7 @@ export default function AuthEntry() {
     if (pending || !configured) return;
     setFormError("");
     if (isDynamicAuthConfigured) {
+      continueAfterAuthentication.current = true;
       openAuth();
       return;
     }
@@ -61,6 +64,7 @@ export default function AuthEntry() {
     }
 
     setEmailError("");
+    continueAfterAuthentication.current = true;
     setPending("email");
     try {
       if (isDynamicAuthConfigured) {
@@ -75,6 +79,14 @@ export default function AuthEntry() {
       setFormError("We couldn’t send a verification code. Check your email and try again.");
       setPending(null);
     }
+  }
+
+  async function useAnotherAccount() {
+    if (pending) return;
+    setPending("switch"); setFormError("");
+    try { await signOut(); continueAfterAuthentication.current = false; setEmail(""); setCode(""); setEmailSent(false); }
+    catch { setFormError("We couldn’t sign out of this account. Please try again."); }
+    finally { setPending(null); }
   }
 
   async function confirmEmailCode(event: FormEvent<HTMLFormElement>) {
@@ -102,14 +114,15 @@ export default function AuthEntry() {
     </section>
     <section className="auth-form-panel" aria-labelledby="auth-heading">
       <div className="auth-form-wrap">
-        <p className="app-eyebrow">Organizer access</p>
-        <h2 id="auth-heading">Continue to Pact</h2>
-        <p className="auth-lede">Sign in or create your account. It only takes a moment.</p>
+        <p className="app-eyebrow">{intent === "payee" ? "Vendor access" : "Organizer access"}</p>
+        <h2 id="auth-heading">{intent === "payee" ? "Review your agreement" : "Continue to Pact"}</h2>
+        <p className="auth-lede">{intent === "payee" ? "Sign in with the verified email your organizer used. Your agreements will be waiting for you." : "Sign in or create your account. It only takes a moment."}</p>
 
         {!configured && <div className="app-banner app-banner-info" role="status"><strong>Authentication setup required</strong><span>Add your Dynamic environment ID to enable Google and verified email sign-in.</span></div>}
         {!isDynamicAuthConfigured && isAuthPreviewEnabled && <div className="auth-preview-note" role="note">Local authentication preview is enabled. Do not use this mode in production.</div>}
         {formError && <div className="app-banner app-banner-error" role="alert">{formError}</div>}
 
+        {intent === "payee" && user && !continueAfterAuthentication.current ? <section className="auth-account-choice" aria-labelledby="current-account-heading"><p id="current-account-heading">Currently signed in as</p><strong>{user.email}</strong><span>Continue only if this is the email named on your agreement.</span><button className="app-primary-button" type="button" onClick={() => void finishAuthentication(user)}>Continue with this email <ArrowRight aria-hidden="true" /></button><button className="app-secondary-button" type="button" onClick={useAnotherAccount} disabled={pending === "switch"} aria-busy={pending === "switch"}>{pending === "switch" ? "Signing out…" : "Use a different email"}</button></section> : <>
         <button className="auth-provider-button" type="button" onClick={continueWithGoogle} disabled={Boolean(pending) || !configured || !ready} aria-busy={pending === "google"}>
           <span className="google-mark" aria-hidden="true">G</span>{pending === "google" ? "Continuing…" : "Continue with Google"}<ArrowRight aria-hidden="true" />
         </button>
@@ -132,7 +145,7 @@ export default function AuthEntry() {
           <button className="app-primary-button" type="submit" disabled={Boolean(pending) || code.length !== 6} aria-busy={pending === "email"}>{pending === "email" ? "Verifying…" : "Verify and continue"}<ArrowRight aria-hidden="true" /></button>
           <button className="auth-change-email" type="button" onClick={() => { setEmailSent(false); setCode(""); setFormError(""); }}>Use a different email</button>
         </form>}
-        <p className="auth-terms">By continuing, you agree to Pact’s terms and privacy policy.</p>
+        <p className="auth-terms">By continuing, you agree to Pact’s terms and privacy policy.</p></>}
       </div>
     </section>
   </main>;

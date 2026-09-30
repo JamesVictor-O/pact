@@ -29,7 +29,7 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export type ExpenseStatus = "unfunded" | "partially_funded" | "funded" | "partially_paid" | "paid" | "overdue" | "cancelled";
 export type ExpensePaymentStatus = "unfunded" | "partially_funded" | "funded" | "paid" | "overdue" | "cancelled";
 export type VendorPayoutStatus = "missing" | "pending" | "verified";
-export type AgreementStatus = "draft" | "awaiting_acceptance" | "active" | "declined" | "cancelled" | "completed";
+export type AgreementStatus = "draft" | "awaiting_acceptance" | "acceptance_signed" | "registration_pending" | "active" | "declined" | "cancelled" | "completed";
 export type InvoiceStatus = "prepared" | "issued" | "confirmed" | "paid" | "voided";
 export type PaymentOperationalStatus = "needs_funding" | "partially_funded" | "payout_setup_needed" | "ready_to_pay" | "overdue" | "processing" | "paid" | "cancelled";
 
@@ -111,6 +111,7 @@ export interface PaymentAgreement {
   agreementHash: string; scheduleHash: string; organizerAddress?: string; payeeAddress?: string;
   organizerSignature?: string; payeeSignature?: string; onchainAgreementId?: string; onchainTxHash?: string;
   registrationStatus: "not_started" | "acceptance_signed" | "pending" | "registered" | "retryable_failure";
+  proposalExpiresAt?: string; registrationError?: string;
   acceptedAt?: string; declinedAt?: string; cancelledAt?: string; createdAt: string; updatedAt: string;
 }
 

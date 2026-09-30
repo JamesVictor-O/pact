@@ -35,6 +35,11 @@
 .auth-lede { margin-top: 12px; color: var(--muted); }
 .auth-form-wrap .app-banner, .auth-preview-note { margin-top: 28px; }
 .auth-preview-note { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); background: var(--soft); font-size: 11px; }
+.auth-account-choice { margin-top: 28px; padding: 24px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); display: grid; gap: 8px; }
+.auth-account-choice > p, .auth-account-choice > span { color: var(--muted); font-size: 13px; }
+.auth-account-choice > strong { overflow-wrap: anywhere; font-size: 16px; }
+.auth-account-choice .app-primary-button { margin-top: 14px; }
+.auth-account-choice .app-secondary-button { margin-top: 2px; }
 .auth-provider-button { width: 100%; min-height: 52px; margin-top: 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-control); display: grid; grid-template-columns: 28px 1fr 28px; align-items: center; background: var(--surface); font-weight: 600; }
 .auth-provider-button > svg { justify-self: end; width: 16px; height: 16px; }
 .google-mark { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 50%; display: grid; place-items: center; font-size: 12px; }
@@ -75,6 +80,8 @@
 .form-submit-row { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .form-submit-row > p { max-width: 260px; color: var(--muted); font-size: 11px; }
 .button-spinner { animation: onboarding-spin 800ms linear infinite; }
+@media (prefers-reduced-motion: reduce) { .button-spinner { animation: none; } }
+.status-retry-button { min-height: 40px; margin-top: 18px; padding: 8px 14px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); font-size: 12px; font-weight: 600; }
 .creation-success { min-height: calc(100svh - 76px); padding: 48px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .creation-success > span { width: 60px; height: 60px; margin-bottom: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--mint); color: var(--success); }
 .creation-success > span svg { width: 26px; height: 26px; }
