@@ -2,6 +2,7 @@ import { hashTypedData, keccak256, stringToHex, toBytes, type Address, type Hex 
 
 export const REGISTRY_DOMAIN_NAME = "PactAgreementRegistry";
 export const REGISTRY_DOMAIN_VERSION = "1";
+export const EVENT_VAULT_FACTORY_DOMAIN_NAME = "PactEventVaultFactory";
 
 export function canonicalBytes32(value: string): Hex {
   return /^0x[0-9a-fA-F]{64}$/.test(value) ? value as Hex : keccak256(toBytes(value));
@@ -26,6 +27,18 @@ export const acceptanceTypes = {
     { name: "invoiceHash", type: "bytes32" },
   ],
 } as const;
+
+export const eventVaultAuthorizationTypes = {
+  EventVaultAuthorization: [
+    { name: "eventId", type: "bytes32" },
+    { name: "organizer", type: "address" },
+    { name: "deadline", type: "uint64" },
+  ],
+} as const;
+
+export function eventVaultFactoryDomain(chainId: number, verifyingContract: Address) {
+  return { name: EVENT_VAULT_FACTORY_DOMAIN_NAME, version: "1", chainId, verifyingContract } as const;
+}
 
 export function registryDomain(chainId: number, verifyingContract: Address) {
   return { name: REGISTRY_DOMAIN_NAME, version: REGISTRY_DOMAIN_VERSION, chainId, verifyingContract } as const;

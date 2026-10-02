@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { filterEventPayments, getEventPayments, getPaymentDueLabel, getPaymentFundingGap, getPaymentOperationalStatus, getPaymentSummary, PAYMENT_OPERATIONAL_STATUS_LABELS, type PaymentFilter } from "../../../../lib/expenses";
 import { getPayeeName } from "../../../../lib/agreements";
 import { formatEventCurrency } from "../../../../lib/funding";
-import { expenseRepository } from "../../../../lib/pact-storage";
+import { financialApi } from "../../../../lib/financial-api";
 import { getAgreementByExpense, type AgreementBundle } from "../../../../lib/agreement-api";
 import type { ExpenseRecord } from "../../../../lib/pact-types";
 import { useCurrentEvent } from "../EventShell";
@@ -34,14 +34,14 @@ export default function PaymentsPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   const loadPayments = useCallback(async () => {
-    try { const next=expenseRepository.listByEvent(event.id);setRecords(next);const loaded=await Promise.all(next.map(async record=>{try{return[record.expense.id,await getAgreementByExpense(record.expense.id)] as const}catch{return null}}));setBundles(Object.fromEntries(loaded.filter(item=>item!==null)));setStatus("ready"); }
+    try { const next=await financialApi.listExpenses(event.id);setRecords(next);const loaded=await Promise.all(next.map(async record=>{try{return[record.expense.id,await getAgreementByExpense(record.expense.id)] as const}catch{return null}}));setBundles(Object.fromEntries(loaded.filter(item=>item!==null)));setStatus("ready"); }
     catch { setStatus("error"); }
   }, [event.id]);
 
   useEffect(() => { void loadPayments(); }, [loadPayments]);
 
   if (status === "loading") return <div className="funding-page funding-loading" aria-label="Loading payments"><span /><span /><span /></div>;
-  if (status === "error") return <section className="funding-error" role="alert"><h1>We couldn’t load payments.</h1><p>Your payment schedules are still safe. Try loading the queue again.</p><button className="app-secondary-button" type="button" onClick={loadPayments}>Try again</button></section>;
+  if (status === "error") return <section className="funding-error" role="alert"><h1>We couldn’t load payments.</h1><p>Your payment schedules are still safe. Try loading the queue again.</p><button className="app-secondary-button" type="button" onClick={()=>void loadPayments()}>Try again</button></section>;
 
   const allPayments = getEventPayments(records);
   const resolveReadiness = (expenseId: string) => ({agreement:bundles[expenseId]?.agreement,invoice:bundles[expenseId]?.invoice??undefined,payout:bundles[expenseId]?.payout??undefined});

@@ -4,9 +4,10 @@ import { ArrowRight, Check, LoaderCircle } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppTopbar from "../../components/AppTopbar";
-import { eventRepository } from "../../../lib/pact-storage";
+import { financialApi } from "../../../lib/financial-api";
 import { DISPLAY_CURRENCIES, EVENT_TYPES, type DisplayCurrency, type EventType, type PactUser } from "../../../lib/pact-types";
 import { usePactAuth } from "../../components/PactAuthProvider";
+import { pactAccountAdapter } from "../../../lib/pact-account-adapter";
 
 type FormValues = {
   name: string;
@@ -53,7 +54,7 @@ export default function CreateEventForm() {
     }
     setUser(authenticatedUser);
     setStatus("idle");
-  }, [authReady, authenticatedUser, router]);
+  }, [authReady, authenticatedUser?.id, router]);
 
   function setField<K extends keyof FormValues>(field: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -80,13 +81,18 @@ export default function CreateEventForm() {
     setStatus("submitting");
     setSubmitError("");
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 350));
-      const created = eventRepository.create(user.id, {
+      const id=`event_${crypto.randomUUID()}`;
+      await pactAccountAdapter.ensureAccount(user);
+      const deadline=new Date(Date.now()+7*24*60*60*1000).toISOString();
+      const authorization=await pactAccountAdapter.signEventVault(user.email,id,deadline);
+      const created = await financialApi.createEvent({
+        id,
         name: values.name.trim(),
         date: values.date,
         estimatedBudget: parseBudget(values.estimatedBudget),
         displayCurrency: values.displayCurrency,
         eventType: values.eventType || undefined,
+        vaultAuthorization:{eventId:id,organizer:authorization.address,deadline,signature:authorization.signature},
       });
       setCreatedName(created.name);
       setStatus("success");
@@ -134,7 +140,7 @@ export default function CreateEventForm() {
           </div>
         </div></fieldset>
         {submitError && <p className="form-submit-error" role="alert">{submitError}</p>}
-        <div className="form-submit-row"><p>You’ll add funding and expenses after this step.</p><button className="app-primary-button" type="submit" disabled={status === "submitting"}>{status === "submitting" ? <><LoaderCircle className="button-spinner" aria-hidden="true" /> Creating your Pact…</> : <>Create Pact <ArrowRight aria-hidden="true" /></>}</button></div>
+        <div className="form-submit-row"><p>Creating your Pact also creates its secure USDC event account.</p><button className="app-primary-button" type="submit" disabled={status === "submitting"}>{status === "submitting" ? <><LoaderCircle className="button-spinner" aria-hidden="true" /> Securing event account…</> : <>Create Pact <ArrowRight aria-hidden="true" /></>}</button></div>
       </form>
     </div>
   </main>;

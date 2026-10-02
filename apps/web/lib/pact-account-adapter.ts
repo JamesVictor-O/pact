@@ -4,7 +4,7 @@ import { createPasskeyWithPrfOutput, createSecp256k1SigningSession, getPasskeyPr
 import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 import { toViemAccount } from "@category-labs/mera/viem";
 import { hexToBytes, keccak256 } from "viem";
-import { acceptanceTypes, canonicalBytes32, currencyBytes32, proposalDigest, proposalTypes, registryDomain } from "./agreement-typed-data";
+import { acceptanceTypes, canonicalBytes32, currencyBytes32, eventVaultAuthorizationTypes, eventVaultFactoryDomain, proposalDigest, proposalTypes, registryDomain } from "./agreement-typed-data";
 import type { Invoice, PaymentAgreement } from "./pact-types";
 
 const LEGACY_CREDENTIAL_KEY = "pact.mera-credential.v1";
@@ -20,7 +20,37 @@ export class PactAccountAdapter {
     return this.withAccount(created.prfOutput, async (account) => ({ address: account.address }));
   }
 
-  async ensureAccount(user: { id:string;name:string;email:string }):Promise<void> {const key=credentialKey(user.email.trim().toLowerCase());if(localStorage.getItem(key))return;const legacy=localStorage.getItem(LEGACY_CREDENTIAL_KEY);if(legacy){const token=getAuthToken();if(token){const response=await fetch("/api/pact-account",{headers:{authorization:`Bearer ${token}`},cache:"no-store"});if(response.ok){const {account}=await response.json() as {account:{signingAddress:string}|null};if(account){localStorage.setItem(key,legacy);return;}}}}await this.setup(user);}
+  async ensureAccount(user: { id:string;name:string;email:string }):Promise<{address:`0x${string}`}> {
+    const key=credentialKey(user.email.trim().toLowerCase());
+    const token=getAuthToken();
+    const stored=localStorage.getItem(key);
+    if(token){
+      const response=await fetch("/api/pact-account",{headers:{authorization:`Bearer ${token}`},cache:"no-store"});
+      if(response.ok){
+        const {account}=await response.json() as {account:{signingAddress:`0x${string}`}|null};
+        if(account&&stored){const credential=JSON.parse(stored) as StoredCredential;const unlocked=await getPasskeyPrfOutput({rpId:window.location.hostname,credential});const local=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));if(local.address.toLowerCase()!==account.signingAddress.toLowerCase())throw new Error("This device passkey does not match your Pact signing account.");return local;}
+        const legacy=localStorage.getItem(LEGACY_CREDENTIAL_KEY);
+        if(account&&legacy){const credential=JSON.parse(legacy) as StoredCredential;const unlocked=await getPasskeyPrfOutput({rpId:window.location.hostname,credential});const local=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));if(local.address.toLowerCase()!==account.signingAddress.toLowerCase())throw new Error("This device passkey does not match your Pact signing account.");localStorage.setItem(key,legacy);return local;}
+        if(account)throw new Error("Your Pact signing account already exists, but its passkey is not available on this device.");
+      }
+    }
+    if(stored){
+      const credential=JSON.parse(stored) as StoredCredential;
+      const unlocked=await getPasskeyPrfOutput({rpId:window.location.hostname,credential});
+      const account=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));await this.bindAccount(account.address);return account;
+    }
+    const account=await this.setup(user);await this.bindAccount(account.address);return account;
+  }
+
+  async signEventVault(userId:string,eventId:string,deadline:string) {
+    const stored=JSON.parse(localStorage.getItem(credentialKey(userId.trim().toLowerCase()))??"null") as StoredCredential|null;
+    if(!stored)throw new Error("Secure Pact account is not configured");
+    const unlocked=await getPasskeyPrfOutput({rpId:window.location.hostname,credential:stored});
+    const address=process.env.NEXT_PUBLIC_PACT_EVENT_VAULT_FACTORY_ADDRESS as `0x${string}`|undefined;
+    if(!address)throw new Error("Event vault factory is not configured");
+    const chainId=Number(process.env.NEXT_PUBLIC_MONAD_CHAIN_ID??10143);
+    return this.withAccount(unlocked.prfOutput,async account=>({address:account.address,signature:await account.signTypedData({domain:eventVaultFactoryDomain(chainId,address),primaryType:"EventVaultAuthorization",types:eventVaultAuthorizationTypes,message:{eventId:canonicalBytes32(eventId),organizer:account.address,deadline:BigInt(Math.floor(new Date(deadline).getTime()/1000))}})}));
+  }
 
   async signAgreement(userId:string, agreement: PaymentAgreement, invoice: Invoice) {
     const stored = JSON.parse(localStorage.getItem(credentialKey(userId.trim().toLowerCase())) ?? "null") as StoredCredential | null;
@@ -39,6 +69,8 @@ export class PactAccountAdapter {
   }
 
   private registry(){const address=process.env.NEXT_PUBLIC_PACT_AGREEMENT_REGISTRY_ADDRESS as `0x${string}`|undefined;if(!address)throw new Error("Agreement registry is not configured");return{address,chainId:Number(process.env.NEXT_PUBLIC_MONAD_CHAIN_ID??10143)};}
+
+  private async bindAccount(address:`0x${string}`){const token=getAuthToken();if(!token)throw new Error("Your authenticated session is unavailable");const response=await fetch("/api/pact-account",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${token}`},body:JSON.stringify({address})});if(!response.ok){const body=await response.json().catch(()=>({})) as {error?:string};throw new Error(body.error??"Pact could not bind your Mera account");}}
 
   private async withAccount<T>(prfOutput: Uint8Array, action: (account: ReturnType<typeof toViemAccount>) => Promise<T>): Promise<T> {
     const session = createSecp256k1SigningSession({ privateKey: privateKeyFromPrf(prfOutput) });

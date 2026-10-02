@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { authClient, eventRepository, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
+import { authClient, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
+import { financialApi } from "../../lib/financial-api";
 import { listAgreements } from "../../lib/agreement-api";
 import { usePactAuth } from "../components/PactAuthProvider";
 
@@ -27,7 +28,7 @@ export default function AuthEntry({ intent }: { intent: "organizer" | "payee" })
   }, [user?.id, intent]);
 
   async function finishAuthentication(user: Awaited<ReturnType<typeof authClient.signInWithEmail>>) {
-    const events = eventRepository.listByOwner(user.id);
+    const events = isDynamicAuthConfigured ? await financialApi.listEvents().catch(()=>[]) : [];
     const pendingAgreements = isDynamicAuthConfigured ? await listAgreements().catch(()=>[]) : [];
     const destination = intent === "payee" ? "/agreements" : events.length > 0 ? "/dashboard" : pendingAgreements.length > 0 ? "/agreements" : "/events/new";
     if (isDynamicAuthConfigured) router.replace(destination);

@@ -6,12 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getExpenseSummary, getUpcomingPayments } from "../../../lib/expenses";
 import { formatEventCurrency, getFundingSummary, type FundingSummary } from "../../../lib/funding";
-import { expenseRepository, fundingRepository } from "../../../lib/pact-storage";
+import { financialApi } from "../../../lib/financial-api";
 import type { ExpenseRecord } from "../../../lib/pact-types";
 import { useCurrentEvent } from "./EventShell";
 
 function formatDate(date: string): string {
-  return new Intl.DateTimeFormat("en", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+  const parsed = new Date(/^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00Z` : date);
+  return Number.isNaN(parsed.getTime()) ? "Date unavailable" : new Intl.DateTimeFormat("en", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(parsed);
 }
 
 export default function EventOverview() {
@@ -22,8 +23,7 @@ export default function EventOverview() {
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
 
   useEffect(() => {
-    setFunding(getFundingSummary(fundingRepository.listByEvent(event.id)));
-    setExpenses(expenseRepository.listByEvent(event.id));
+    let live=true;Promise.all([financialApi.listFunding(event.id),financialApi.listExpenses(event.id)]).then(([sources,records])=>{if(!live)return;setFunding(getFundingSummary(sources,{allocated:sources.reduce((sum,source)=>sum+(source.allocatedAmount??0),0)}));setExpenses(records);}).catch(()=>undefined);return()=>{live=false};
   }, [event.id]);
 
   const expenseSummary = getExpenseSummary(expenses);

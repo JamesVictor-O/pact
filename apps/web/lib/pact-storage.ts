@@ -117,6 +117,7 @@ class BrowserEventRepository implements EventRepository {
       id: createId("event"),
       ownerId,
       status: "active",
+      vaultStatus: "not_started",
       createdAt: new Date().toISOString(),
     };
 
@@ -148,6 +149,7 @@ class BrowserFundingRepository implements FundingRepository {
     const timestamp = new Date().toISOString();
     const source: FundingSource = {
       ...input,
+      receivedAmount: input.receivedAmount ?? 0,
       id: createId("funding"),
       eventId,
       createdAt: timestamp,

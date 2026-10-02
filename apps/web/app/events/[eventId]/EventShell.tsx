@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Activity, Banknote, ChevronDown, CircleDollarSign, LayoutDashboard, LogOut, ReceiptText, UsersRound } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
-import { eventRepository } from "../../../lib/pact-storage";
+import { financialApi, migrateLegacyFinancialData } from "../../../lib/financial-api";
 import type { PactEvent, PactUser } from "../../../lib/pact-types";
 import { usePactAuth } from "../../components/PactAuthProvider";
 
@@ -40,16 +40,8 @@ export default function EventShell({ eventId, children }: { eventId: string; chi
       router.replace("/auth");
       return;
     }
-    const storedEvent = eventRepository.findById(eventId);
-    if (!storedEvent || storedEvent.ownerId !== authenticatedUser.id) {
-      setStatus("missing");
-      setUser(authenticatedUser);
-      return;
-    }
-    setUser(authenticatedUser);
-    setEvent(storedEvent);
-    setStatus("ready");
-  }, [authReady, authenticatedUser, eventId, router]);
+    let live=true;setUser(authenticatedUser);migrateLegacyFinancialData().then(()=>financialApi.getEvent(eventId)).then(storedEvent=>{if(!live)return;setEvent(storedEvent);setStatus("ready");}).catch(()=>live&&setStatus("missing"));return()=>{live=false};
+  }, [authReady, authenticatedUser?.id, eventId, router]);
 
   async function signOut() {
     await endSession();

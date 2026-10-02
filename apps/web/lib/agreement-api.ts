@@ -12,6 +12,8 @@ export async function listAgreements(){return (await request<{agreements:Payment
 export async function getAgreement(id:string){return request<AgreementBundle>(`/api/agreements/${id}`);}
 export async function getAgreementByExpense(id:string){return request<AgreementBundle>(`/api/agreements/by-expense/${id}`);}
 export async function submitProposal(id:string,input:{address:string;signature:string;expiresAt:string}){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/proposal`,{method:"POST",body:JSON.stringify(input)})).agreement;}
-export async function acceptAgreement(id:string,input:{address:string;signature:string}){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/accept`,{method:"POST",body:JSON.stringify(input)})).agreement;}
+export type PayoutSelection={type:"mera";address:string}|{type:"external_wallet";address:string;message:string;signature:string};
+export async function createPayoutChallenge(id:string,address:string){return request<{message:string;address:string;chainId:number}>(`/api/agreements/${id}/payout-challenge`,{method:"POST",body:JSON.stringify({address})});}
+export async function acceptAgreement(id:string,input:{address:string;signature:string;payout:PayoutSelection}){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/accept`,{method:"POST",body:JSON.stringify(input)})).agreement;}
 export async function retryAgreement(id:string){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/retry`,{method:"POST"})).agreement;}
 export async function getInvoice(id:string){return (await request<{invoice:Invoice}>(`/api/invoices/${id}`)).invoice;}

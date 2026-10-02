@@ -53,13 +53,13 @@ export async function bindPactAccount(userId:string,address:string) {
 }
 export async function pactAccountForUser(userId:string) { const row=await oneOrNull<{signing_address:string}>(`select signing_address from pact_accounts where user_id=$1`,[userId]);return row?{signingAddress:row.signing_address}:null; }
 
-export async function saveAcceptance(id:string,email:string,userId:string,address:string,signature:string) {
+export async function saveAcceptance(id:string,email:string,userId:string,address:string,signature:string,payout:{type:PayoutProfile["payoutType"];address:string}) {
   return transaction(async(client)=>{
     const result=await client.query<AgreementRow>(`select * from payment_agreements where id=$1 for update`,[id]); const current=result.rows[0];
     if(!current||current.payee_email!==email) return null;
     if(["acceptance_signed","registration_pending","active"].includes(current.status)) return mapAgreement(current);
     if(current.status!=="awaiting_acceptance") return null;
-    await client.query(`insert into payout_profiles(user_id,signing_address,payout_type,payout_address,verification_status,verified_at,updated_at) values($1,$2,'mera',$2,'verified',now(),now()) on conflict(user_id) do update set signing_address=excluded.signing_address,payout_type='mera',payout_address=excluded.payout_address,verification_status='verified',verified_at=now(),updated_at=now()`,[userId,address]);
+    await client.query(`insert into payout_profiles(user_id,signing_address,payout_type,payout_address,verification_status,verified_at,updated_at) values($1,$2,$3,$4,'verified',now(),now()) on conflict(user_id) do update set signing_address=excluded.signing_address,payout_type=excluded.payout_type,payout_address=excluded.payout_address,verification_status='verified',verified_at=now(),updated_at=now()`,[userId,address,payout.type,payout.address]);
     await client.query(`update invoices set status='issued',updated_at=now() where agreement_id=$1 and status='prepared'`,[id]);
     const updated=await client.query<AgreementRow>(`update payment_agreements set payee_user_id=$2,payee_address=$3,payee_signature=$4,status='acceptance_signed',registration_status='acceptance_signed',accepted_at=coalesce(accepted_at,now()),registration_error=null,updated_at=now() where id=$1 returning *`,[id,userId,address,bytes(signature)]);
     return mapAgreement(updated.rows[0]!);

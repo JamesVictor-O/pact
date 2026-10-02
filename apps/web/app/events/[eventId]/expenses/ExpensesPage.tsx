@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EXPENSE_STATUS_LABELS, getExpenseFundedAmount, getExpenseStatus, getExpenseSummary, getNextPayment } from "../../../../lib/expenses";
 import { getPayeeName } from "../../../../lib/agreements";
 import { formatEventCurrency, formatFundingDate } from "../../../../lib/funding";
-import { expenseRepository } from "../../../../lib/pact-storage";
+import { financialApi } from "../../../../lib/financial-api";
 import type { ExpenseRecord } from "../../../../lib/pact-types";
 import { useCurrentEvent } from "../EventShell";
 
@@ -17,14 +17,14 @@ export default function ExpensesPage() {
   const [records, setRecords] = useState<ExpenseRecord[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
-  const loadExpenses = useCallback(() => {
-    try { setRecords(expenseRepository.listByEvent(event.id)); setStatus("ready"); }
+  const loadExpenses = useCallback(async () => {
+    try { setRecords(await financialApi.listExpenses(event.id)); setStatus("ready"); }
     catch { setStatus("error"); }
   }, [event.id]);
-  useEffect(() => loadExpenses(), [loadExpenses]);
+  useEffect(() => {void loadExpenses()}, [loadExpenses]);
 
   if (status === "loading") return <div className="funding-page funding-loading" aria-label="Loading expenses"><span /><span /><span /></div>;
-  if (status === "error") return <section className="funding-error" role="alert"><h1>We couldn’t load expenses.</h1><p>Your event is still safe. Try loading the expenses again.</p><button className="app-secondary-button" type="button" onClick={loadExpenses}>Try again</button></section>;
+  if (status === "error") return <section className="funding-error" role="alert"><h1>We couldn’t load expenses.</h1><p>Your event is still safe. Try loading the expenses again.</p><button className="app-secondary-button" type="button" onClick={()=>void loadExpenses()}>Try again</button></section>;
 
   const summary = getExpenseSummary(records);
   const metrics = [

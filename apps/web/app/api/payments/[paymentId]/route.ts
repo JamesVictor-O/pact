@@ -1,0 +1,2 @@
+import { NextRequest,NextResponse } from "next/server";import { requireIdentity } from "../../../../lib/server/auth";import { findPayment } from "../../../../lib/server/financial-repository";import { apiError } from "../../../../lib/server/http";
+export async function GET(request:NextRequest,{params}:{params:Promise<{paymentId:string}>}){try{const i=await requireIdentity(request),{paymentId}=await params,r=await findPayment(paymentId,i.userId);return r?NextResponse.json({record:r}):NextResponse.json({error:"Payment not found"},{status:404});}catch(e){return apiError(e);}}

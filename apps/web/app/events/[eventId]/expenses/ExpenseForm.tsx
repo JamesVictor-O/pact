@@ -8,7 +8,7 @@ import { EXPENSE_CATEGORY_LABELS } from "../../../../lib/expenses";
 import { getPayeeEmail, getPayeeName } from "../../../../lib/agreements";
 import { createAgreementForExpense, submitProposal } from "../../../../lib/agreement-api";
 import { pactAccountAdapter } from "../../../../lib/pact-account-adapter";
-import { expenseRepository } from "../../../../lib/pact-storage";
+import { financialApi } from "../../../../lib/financial-api";
 import { EXPENSE_CATEGORIES, type ExpenseCategory, type ExpensePaymentInput, type ExpenseRecord } from "../../../../lib/pact-types";
 import { useCurrentEvent } from "../EventShell";
 import { usePactAuth } from "../../../components/PactAuthProvider";
@@ -67,7 +67,7 @@ export default function ExpenseForm({ expenseId }: { expenseId?: string }) {
   const [status, setStatus] = useState<"loading" | "idle" | "submitting" | "missing">(expenseId ? "loading" : "idle");
   const [submitError, setSubmitError] = useState("");
 
-  useEffect(() => { if (!expenseId) return; const record = expenseRepository.findById(expenseId); if (!record || record.expense.eventId !== event.id) { setStatus("missing"); return; } setValues(fromRecord(record)); setStatus("idle"); }, [event.id, expenseId]);
+  useEffect(() => { if (!expenseId) return;let live=true;financialApi.getExpense(expenseId).then(record=>{if(!live)return;if(record.expense.eventId!==event.id){setStatus("missing");return;}setValues(fromRecord(record));setStatus("idle");}).catch(()=>live&&setStatus("missing"));return()=>{live=false}; }, [event.id, expenseId]);
 
   function setField(field: keyof Omit<FormValues, "payments" | "scheduleType">, value: string) { setValues((current) => ({ ...current, [field]: value })); setErrors((current) => ({ ...current, [field]: undefined, ...(field === "totalAmount" ? { schedule: undefined } : {}) })); }
   function changeTotal(value: string) { setValues((current) => { const oldTotal = parseAmount(current.totalAmount); const nextTotal = parseAmount(value); const payments = current.payments.map((payment) => ({ ...payment })); if (current.scheduleType === "single" && payments[0] && (!payments[0].amount || parseAmount(payments[0].amount) === oldTotal)) payments[0].amount = Number.isFinite(nextTotal) ? amountString(nextTotal) : ""; if (current.scheduleType === "deposit" && payments[1]) { const deposit = parseAmount(payments[0]?.amount ?? ""); payments[1].amount = Number.isFinite(nextTotal) && Number.isFinite(deposit) ? amountString(Math.max(nextTotal - deposit, 0)) : ""; } return { ...current, totalAmount: value, payments }; }); setErrors((current) => ({ ...current, totalAmount: undefined, schedule: undefined })); }
@@ -84,7 +84,7 @@ export default function ExpenseForm({ expenseId }: { expenseId?: string }) {
     try {
       const payments: ExpensePaymentInput[] = values.payments.map((payment) => ({ id: payment.id, label: payment.label.trim(), amount: parseAmount(payment.amount), dueDate: payment.dueDate || undefined, fundedAmount: payment.fundedAmount, paidAmount: payment.paidAmount }));
       const input = { title: values.title.trim(), payeeName: values.payeeName.trim(), payeeEmail: values.payeeEmail.trim(), category: values.category as ExpenseCategory, totalAmount: parseAmount(values.totalAmount), payments };
-      const saved = expenseId ? expenseRepository.update(expenseId, input) : expenseRepository.create(event.id, input); if (!saved) throw new Error("Expense not found");
+      const saved = expenseId ? await financialApi.updateExpense(expenseId, input) : await financialApi.createExpense(event.id, input); if (!saved) throw new Error("Expense not found");
       if (!expenseId) {
         if (!user) throw new Error("Authentication required");
         const agreement = await createAgreementForExpense(saved, event, user);

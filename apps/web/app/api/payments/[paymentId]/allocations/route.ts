@@ -1,0 +1,2 @@
+import { NextRequest,NextResponse } from "next/server";import { requireIdentity } from "../../../../../lib/server/auth";import { listPaymentAllocations } from "../../../../../lib/server/financial-repository";import { apiError } from "../../../../../lib/server/http";
+export async function GET(request:NextRequest,{params}:{params:Promise<{paymentId:string}>}){try{const i=await requireIdentity(request),{paymentId}=await params;return NextResponse.json({allocations:await listPaymentAllocations(paymentId,i.userId)});}catch(e){return apiError(e);}}

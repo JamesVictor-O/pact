@@ -6,7 +6,7 @@ import {
   useDynamicContext,
   type UserProfile,
 } from "@dynamic-labs/sdk-react-core";
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { authClient, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
 import type { PactUser } from "../../lib/pact-types";
 
@@ -45,7 +45,7 @@ function toPactUser(user: UserProfile): PactUser {
 function DynamicAuthBridge({ children }: { children: ReactNode }) {
   const { user: dynamicUser, sdkHasLoaded, setShowAuthFlow, handleLogOut } = useDynamicContext();
   const { connectWithEmail, verifyOneTimePassword } = useConnectWithOtp();
-  const pactUser = dynamicUser ? toPactUser(dynamicUser) : null;
+  const pactUser = useMemo(() => dynamicUser ? toPactUser(dynamicUser) : null, [dynamicUser?.userId, dynamicUser?.sessionId, dynamicUser?.email, dynamicUser?.firstName, dynamicUser?.lastName, dynamicUser?.alias]);
 
   useEffect(() => {
     if (pactUser) authClient.establishSession(pactUser);

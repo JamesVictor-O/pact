@@ -49,6 +49,12 @@ export interface PactEvent {
   displayCurrency: DisplayCurrency;
   eventType?: EventType;
   status: "active";
+  organizerAddress?: string;
+  vaultAddress?: string;
+  vaultFactoryAddress?: string;
+  vaultStatus: "not_started" | "provisioning" | "ready" | "retryable_failure";
+  vaultTransactionHash?: string;
+  vaultError?: string;
   createdAt: string;
 }
 
@@ -57,6 +63,15 @@ export type NewPactEvent = Pick<
   "name" | "date" | "estimatedBudget" | "displayCurrency" | "eventType"
 >;
 
+export type EventVaultAuthorization = {
+  eventId: string;
+  organizer: `0x${string}`;
+  deadline: string;
+  signature: `0x${string}`;
+};
+
+export type CreatePactEventInput = NewPactEvent & { id: string; vaultAuthorization: EventVaultAuthorization };
+
 export interface FundingSource {
   id: string;
   eventId: string;
@@ -64,6 +79,7 @@ export interface FundingSource {
   name: string;
   committedAmount: number;
   receivedAmount: number;
+  allocatedAmount?: number;
   expectedDate?: string;
   notes?: string;
   cancelledAt?: string;
@@ -73,8 +89,33 @@ export interface FundingSource {
 
 export type FundingSourceInput = Pick<
   FundingSource,
-  "type" | "name" | "committedAmount" | "receivedAmount" | "expectedDate" | "notes"
->;
+  "type" | "name" | "committedAmount" | "expectedDate" | "notes"
+> & { /** Legacy import only. Interactive flows cannot assert receipt. */ receivedAmount?: number };
+
+export type FundingRequestStatus = "draft" | "sent" | "routing" | "received" | "partially_allocated" | "allocated" | "refunded" | "cancelled" | "failed";
+export interface FundingRequest {
+  id: string; eventId: string; fundingSourceId: string; publicSlug: string; amount: number; currency: DisplayCurrency;
+  status: FundingRequestStatus; onchainRequestId?: string; expiresAt?: string; sentAt?: string; createdAt: string; updatedAt: string;
+}
+
+export interface FundingReceipt {
+  id: string; fundingRequestId: string; eventId: string; contributorAddress: string; settlementTokenAddress: string;
+  amountAtomic: string; amount: number; chainId: number; transactionHash: string; blockNumber: number;
+  status: "confirming" | "confirmed" | "reorged" | "refunded"; confirmedAt?: string; createdAt: string;
+}
+
+export type AuroraDepositChain = "evm" | "btc" | "sol" | "tron" | "near" | "stellar";
+export type AuroraRouteStatus = "ready" | "deposit_received" | "processing" | "success" | "failed";
+export interface AuroraDepositRoute {
+  id:string;fundingRequestId:string;eventId:string;depositChain:AuroraDepositChain;depositAddress:string;depositMemo?:string;
+  destinationChain:string;destinationAsset:string;recipientAddress:string;status:AuroraRouteStatus;lastError?:string;lastSyncedAt?:string;createdAt:string;updatedAt:string;
+}
+
+export interface PaymentSettlement {
+  id: string; eventId: string; agreementId: string; paymentId: string; payoutAddress: string; settlementTokenAddress: string;
+  amountAtomic: string; amount: number; transactionHash?: string; status: "authorization_signed" | "submitted" | "confirmed" | "failed";
+  failureMessage?: string; confirmedAt?: string; createdAt: string;
+}
 
 export interface Expense {
   id: string;
@@ -145,6 +186,15 @@ export interface ExpensePayment {
   cancelledAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Allocation {
+  id: string;
+  eventId: string;
+  fundingSourceId: string;
+  paymentId: string;
+  amount: number;
+  createdAt: string;
 }
 
 export type ExpensePaymentInput = Pick<ExpensePayment, "label" | "amount" | "dueDate" | "fundedAmount" | "paidAmount"> & { id?: string };

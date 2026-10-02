@@ -1,0 +1,7 @@
+import { NextRequest, NextResponse } from "next/server";
+import { AuroraIntentsError } from "../../../../../lib/server/aurora-intents";
+import { createAuroraRoute, listAuroraRoutes } from "../../../../../lib/server/aurora-repository";
+import { apiError } from "../../../../../lib/server/http";
+
+export async function GET(_:NextRequest,{params}:{params:Promise<{slug:string}>}){try{const {slug}=await params;const result=await listAuroraRoutes(slug);return result?NextResponse.json(result):NextResponse.json({error:"Funding request not found"},{status:404});}catch(error){return apiError(error);}}
+export async function POST(request:NextRequest,{params}:{params:Promise<{slug:string}>}){try{const {slug}=await params;const body=await request.json() as {depositChain?:string};const route=await createAuroraRoute(slug,body.depositChain??"");return route?NextResponse.json({route},{status:201}):NextResponse.json({error:"Funding request not found"},{status:404});}catch(error){if(error instanceof AuroraIntentsError)return NextResponse.json({error:error.message,correlationId:error.correlationId},{status:error.status});if(error instanceof Error&&["Choose a supported source network","The event account is not ready","Aurora routing is not enabled","Aurora API key is missing","Aurora destination does not match the event-vault network","Aurora destination token does not match the event-vault token"].includes(error.message))return NextResponse.json({error:error.message},{status:error.message.includes("not ready")?409:503});return apiError(error);}}

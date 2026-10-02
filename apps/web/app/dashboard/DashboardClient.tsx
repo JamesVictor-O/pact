@@ -5,13 +5,14 @@ import { ArrowRight, CalendarDays, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AppTopbar from "../components/AppTopbar";
-import { eventRepository } from "../../lib/pact-storage";
+import { financialApi, migrateLegacyFinancialData } from "../../lib/financial-api";
 import { listAgreements } from "../../lib/agreement-api";
 import type { PactEvent, PactUser } from "../../lib/pact-types";
 import { usePactAuth } from "../components/PactAuthProvider";
 
 function formatDate(date: string): string {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+  const parsed = new Date(/^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00Z` : date);
+  return Number.isNaN(parsed.getTime()) ? "Date unavailable" : new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(parsed);
 }
 
 export default function DashboardClient() {
@@ -28,16 +29,8 @@ export default function DashboardClient() {
       router.replace("/auth");
       return;
     }
-    const ownerEvents = eventRepository.listByOwner(authenticatedUser.id);
-    if (ownerEvents.length === 0) {
-      router.replace("/events/new");
-      return;
-    }
-    setUser(authenticatedUser);
-    setEvents(ownerEvents);
-    void listAgreements().then(items=>setPendingAgreements(items.filter(item=>item.status==="awaiting_acceptance").length)).catch(()=>setPendingAgreements(0));
-    setLoading(false);
-  }, [authReady, authenticatedUser, router]);
+    let live=true;migrateLegacyFinancialData().then(()=>Promise.all([financialApi.listEvents(),listAgreements().catch(()=>[])])).then(([ownerEvents,agreements])=>{if(!live)return;if(ownerEvents.length===0){router.replace("/events/new");return;}setUser(authenticatedUser);setEvents(ownerEvents);setPendingAgreements(agreements.filter(item=>item.status==="awaiting_acceptance").length);setLoading(false);}).catch(()=>{if(live)setLoading(false);});return()=>{live=false};
+  }, [authReady, authenticatedUser?.id, router]);
 
   return <main className="app-standalone"><AppTopbar userName={user?.name} compact /><div className="dashboard-shell">
     {pendingAgreements > 0 && <Link className="app-banner app-banner-info dashboard-agreement-banner" href="/agreements"><strong>{pendingAgreements} {pendingAgreements === 1 ? "agreement" : "agreements"} waiting for review</strong><ArrowRight aria-hidden="true" /></Link>}
