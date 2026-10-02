@@ -4,6 +4,15 @@ Pact may require narrowly scoped Monad contracts for event funding, allocations,
 
 This directory is reserved for that validated settlement layer. Any custody, upgrade, or authorization design requires an explicit architecture decision because it changes audit and delivery risk.
 
+## Monad mainnet deployment
+
+- Chain ID: `143`
+- `PactAgreementRegistry`: `0xc2B0D2A7e858F13b349843fF87dBF4EBF9227F49`
+- `PactEventVaultFactory`: `0xF7602C048F8C7Cc5E8c514522D633eb9A16a3a1B`
+- Settlement token (USDC): `0x754704Bc059F8C67012fEd69BC8A327a5aafb603`
+
+The factory deploys route-aware vaults: direct releases increment paid accounting, while Aurora releases enter `paymentRouting` and do not claim destination delivery.
+
 ## Agreement registry
 
 Deploy the registry to the configured Monad environment:

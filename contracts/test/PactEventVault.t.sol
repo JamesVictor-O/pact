@@ -93,6 +93,24 @@ contract PactEventVaultTest is Test {
         assertEq(vault.paymentPaid(paymentId), 600e6);
     }
 
+    function testRoutedPaymentDoesNotClaimDestinationDelivery() public {
+        vm.prank(sponsor);
+        token.transfer(address(vault), 1_000e6);
+        uint64 deadline = uint64(block.timestamp + 1 hours);
+        bytes memory allocation = _sign(organizerKey, vault.allocationDigest(agreementId, paymentId, 1_000e6, 0, deadline));
+        vault.allocate(agreementId, paymentId, 1_000e6, 0, deadline, allocation);
+        bytes32 routeId = keccak256("aurora-route");
+        address depositAddress = address(0xA0A0);
+        bytes memory route = _sign(organizerKey, vault.routeDigest(agreementId, paymentId, routeId, depositAddress, 600e6, 1, deadline));
+        vm.prank(relayer);
+        vault.routePayment(agreementId, paymentId, routeId, depositAddress, 600e6, 1, deadline, route);
+        assertEq(token.balanceOf(depositAddress), 600e6);
+        assertEq(vault.paymentAllocated(paymentId), 400e6);
+        assertEq(vault.paymentRouting(paymentId), 600e6);
+        assertEq(vault.paymentPaid(paymentId), 0);
+        assertEq(vault.routeAmount(routeId), 600e6);
+    }
+
     function testCannotAllocateAnotherEventsAgreement() public {
         vm.prank(sponsor);
         token.transfer(address(vault), 100e6);

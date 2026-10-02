@@ -1,7 +1,7 @@
 "use client";
 import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 import { getPayeeEmail, getPayeeName, hashAgreementSnapshot, hashCanonical, hashSchedule } from "./agreements";
-import type { AgreementSnapshot, ExpenseRecord, Invoice, PactEvent, PactUser, PaymentAgreement, PayoutProfile } from "./pact-types";
+import type { AgreementSnapshot, ExpenseRecord, Invoice, PactEvent, PactUser, PaymentAgreement, PayoutAssetOption, PayoutPreference, PayoutProfile } from "./pact-types";
 
 export type AgreementBundle={agreement:PaymentAgreement;invoice:Invoice;payout:PayoutProfile|null};
 async function request<T>(path:string,init?:RequestInit):Promise<T>{const token=getAuthToken();if(!token)throw new Error("Your authenticated session is unavailable");const response=await fetch(path,{...init,headers:{"content-type":"application/json",authorization:`Bearer ${token}`,...init?.headers},cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Request failed");return body as T;}
@@ -12,7 +12,8 @@ export async function listAgreements(){return (await request<{agreements:Payment
 export async function getAgreement(id:string){return request<AgreementBundle>(`/api/agreements/${id}`);}
 export async function getAgreementByExpense(id:string){return request<AgreementBundle>(`/api/agreements/by-expense/${id}`);}
 export async function submitProposal(id:string,input:{address:string;signature:string;expiresAt:string}){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/proposal`,{method:"POST",body:JSON.stringify(input)})).agreement;}
-export type PayoutSelection={type:"mera";address:string}|{type:"external_wallet";address:string;message:string;signature:string};
+export type PayoutSelection=({type:"mera";address:string}|{type:"external_wallet";address:string;message?:string;signature?:string})&{preference:PayoutPreference};
+export async function listPayoutAssets(){return request<{assets:PayoutAssetOption[];enabled:boolean;reason?:string}>("/api/payout-options");}
 export async function createPayoutChallenge(id:string,address:string){return request<{message:string;address:string;chainId:number}>(`/api/agreements/${id}/payout-challenge`,{method:"POST",body:JSON.stringify({address})});}
 export async function acceptAgreement(id:string,input:{address:string;signature:string;payout:PayoutSelection}){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/accept`,{method:"POST",body:JSON.stringify(input)})).agreement;}
 export async function retryAgreement(id:string){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/retry`,{method:"POST"})).agreement;}

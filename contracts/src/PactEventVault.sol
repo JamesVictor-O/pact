@@ -34,6 +34,9 @@ contract PactEventVault is EIP712, ReentrancyGuard {
     bytes32 public constant RELEASE_TYPEHASH = keccak256(
         "EventPaymentRelease(bytes32 agreementId,bytes32 paymentId,address payoutAddress,uint256 amount,uint256 nonce,uint64 deadline)"
     );
+    bytes32 public constant ROUTE_TYPEHASH = keccak256(
+        "EventPaymentRoute(bytes32 agreementId,bytes32 paymentId,bytes32 routeId,address depositAddress,uint256 amount,uint256 nonce,uint64 deadline)"
+    );
     bytes32 public constant REFUND_TYPEHASH = keccak256(
         "EventRefund(bytes32 fundingReceiptId,address recipient,uint256 amount,uint256 nonce,uint64 deadline)"
     );
@@ -50,6 +53,9 @@ contract PactEventVault is EIP712, ReentrancyGuard {
     mapping(bytes32 => uint256) public paymentPaid;
     mapping(bytes32 => uint256) public agreementAllocated;
     mapping(bytes32 => uint256) public agreementPaid;
+    mapping(bytes32 => uint256) public paymentRouting;
+    mapping(bytes32 => uint256) public agreementRouting;
+    mapping(bytes32 => uint256) public routeAmount;
     mapping(bytes32 => bytes32) public paymentAgreement;
     mapping(bytes32 => uint256) public refundedByReceipt;
 
@@ -64,6 +70,7 @@ contract PactEventVault is EIP712, ReentrancyGuard {
 
     event FundsAllocated(bytes32 indexed agreementId, bytes32 indexed paymentId, uint256 amount);
     event PaymentReleased(bytes32 indexed agreementId, bytes32 indexed paymentId, address indexed payoutAddress, uint256 amount);
+    event PaymentRouted(bytes32 indexed agreementId, bytes32 indexed paymentId, bytes32 indexed routeId, address depositAddress, uint256 amount);
     event FundingRefunded(bytes32 indexed fundingReceiptId, address indexed recipient, uint256 amount);
 
     constructor(bytes32 eventId_, address organizer_, address registry_, address token_) EIP712("PactEventVault", "1") {
@@ -103,7 +110,7 @@ contract PactEventVault is EIP712, ReentrancyGuard {
             organizerSignature
         );
         if (availableBalance() < amount) revert InsufficientAvailable();
-        if (agreementAllocated[agreementId] + agreementPaid[agreementId] + amount > agreementTotal) {
+        if (agreementAllocated[agreementId] + agreementPaid[agreementId] + agreementRouting[agreementId] + amount > agreementTotal) {
             revert AgreementLimitExceeded();
         }
         bytes32 boundAgreement = paymentAgreement[paymentId];
@@ -113,6 +120,38 @@ contract PactEventVault is EIP712, ReentrancyGuard {
         paymentAllocated[paymentId] += amount;
         agreementAllocated[agreementId] += amount;
         emit FundsAllocated(agreementId, paymentId, amount);
+    }
+
+    /// @notice Releases allocated USDC to a cross-chain route without claiming destination delivery.
+    function routePayment(
+        bytes32 agreementId,
+        bytes32 paymentId,
+        bytes32 routeId,
+        address depositAddress,
+        uint256 amount,
+        uint256 nonce,
+        uint64 deadline,
+        bytes calldata organizerSignature
+    ) external nonReentrant {
+        if (paymentId == bytes32(0) || routeId == bytes32(0) || depositAddress == address(0)) revert InvalidInput();
+        if (amount == 0 || routeAmount[routeId] != 0) revert InvalidAmount();
+        _activeAgreement(agreementId);
+        if (paymentAgreement[paymentId] != agreementId) revert InvalidAgreement();
+        if (paymentAllocated[paymentId] < amount || allocatedTotal < amount) revert InsufficientAllocation();
+        _authorize(
+            nonce,
+            deadline,
+            keccak256(abi.encode(ROUTE_TYPEHASH, agreementId, paymentId, routeId, depositAddress, amount, nonce, deadline)),
+            organizerSignature
+        );
+        paymentAllocated[paymentId] -= amount;
+        agreementAllocated[agreementId] -= amount;
+        allocatedTotal -= amount;
+        paymentRouting[paymentId] += amount;
+        agreementRouting[agreementId] += amount;
+        routeAmount[routeId] = amount;
+        settlementToken.safeTransfer(depositAddress, amount);
+        emit PaymentRouted(agreementId, paymentId, routeId, depositAddress, amount);
     }
 
     function release(
@@ -178,6 +217,12 @@ contract PactEventVault is EIP712, ReentrancyGuard {
         external view returns (bytes32)
     {
         return _hashTypedDataV4(keccak256(abi.encode(RELEASE_TYPEHASH, agreementId, paymentId, payoutAddress, amount, nonce, deadline)));
+    }
+
+    function routeDigest(bytes32 agreementId, bytes32 paymentId, bytes32 routeId, address depositAddress, uint256 amount, uint256 nonce, uint64 deadline)
+        external view returns (bytes32)
+    {
+        return _hashTypedDataV4(keccak256(abi.encode(ROUTE_TYPEHASH, agreementId, paymentId, routeId, depositAddress, amount, nonce, deadline)));
     }
 
     function refundDigest(bytes32 fundingReceiptId, address recipient, uint256 amount, uint256 nonce, uint64 deadline)

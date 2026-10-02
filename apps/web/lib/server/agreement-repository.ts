@@ -1,7 +1,7 @@
 import "server-only";
 import type { PoolClient, QueryResultRow } from "pg";
 import { database, oneOrNull, transaction } from "./database";
-import type { Invoice, PaymentAgreement, PayoutProfile } from "../pact-types";
+import type { Invoice, PaymentAgreement, PayoutPreference, PayoutProfile } from "../pact-types";
 
 type AgreementRow = QueryResultRow & {
   id: string; event_id: string; expense_id: string; organizer_user_id: string; payee_id: string; payee_email: string; payee_user_id: string | null;
@@ -12,7 +12,7 @@ type AgreementRow = QueryResultRow & {
   accepted_at: Date | null; declined_at: Date | null; cancelled_at: Date | null; created_at: Date; updated_at: Date;
 };
 type InvoiceRow = QueryResultRow & { id:string; event_id:string; direction:Invoice["direction"]; funding_source_id:string|null; agreement_id:string|null; invoice_number:string; snapshot:Invoice["snapshot"]; amount_minor:string; currency:string; status:Invoice["status"]; document_hash:Buffer; confirmed_at:Date|null; paid_at:Date|null; created_at:Date; updated_at:Date };
-type PayoutRow = QueryResultRow & { user_id:string; signing_address:string; payout_type:PayoutProfile["payoutType"]; payout_address:string; verification_status:PayoutProfile["verificationStatus"]; verified_at:Date|null };
+type PayoutRow = QueryResultRow & { user_id:string; signing_address:string; payout_type:PayoutProfile["payoutType"]; payout_address:string; verification_status:PayoutProfile["verificationStatus"]; verified_at:Date|null;destination_chain:string;destination_asset_id:string;destination_asset_symbol:string;destination_asset_decimals:number;destination_address:string;destination_verification:PayoutProfile["destinationVerification"] };
 
 const hex = (value: Buffer | null) => value ? `0x${value.toString("hex")}` : undefined;
 const bytes = (value: string) => Buffer.from(value.replace(/^0x/, ""), "hex");
@@ -22,7 +22,7 @@ export function mapAgreement(row: AgreementRow): PaymentAgreement {
   return { id:row.id,eventId:row.event_id,expenseId:row.expense_id,organizerUserId:row.organizer_user_id,payeeId:row.payee_id,payeeEmail:row.payee_email,payeeUserId:row.payee_user_id??undefined,totalAmountMinor:Number(row.total_amount_minor),currency:row.currency as PaymentAgreement["currency"],status:row.status,snapshot:row.snapshot,agreementHash:hex(row.agreement_hash)!,scheduleHash:hex(row.schedule_hash)!,organizerAddress:row.organizer_address??undefined,payeeAddress:row.payee_address??undefined,organizerSignature:hex(row.organizer_signature),payeeSignature:hex(row.payee_signature),registrationStatus:row.registration_status,proposalExpiresAt:iso(row.proposal_expires_at),onchainAgreementId:row.onchain_agreement_id??undefined,onchainTxHash:row.onchain_tx_hash??undefined,registrationError:row.registration_error??undefined,acceptedAt:iso(row.accepted_at),declinedAt:iso(row.declined_at),cancelledAt:iso(row.cancelled_at),createdAt:row.created_at.toISOString(),updatedAt:row.updated_at.toISOString() };
 }
 export function mapInvoice(row: InvoiceRow): Invoice { return {id:row.id,eventId:row.event_id,direction:row.direction,fundingSourceId:row.funding_source_id??undefined,agreementId:row.agreement_id??undefined,invoiceNumber:row.invoice_number,snapshot:row.snapshot,amountMinor:Number(row.amount_minor),currency:row.currency as Invoice["currency"],status:row.status,documentHash:hex(row.document_hash)!,confirmedAt:iso(row.confirmed_at),paidAt:iso(row.paid_at),createdAt:row.created_at.toISOString(),updatedAt:row.updated_at.toISOString()}; }
-export function mapPayout(row: PayoutRow): PayoutProfile { return {userId:row.user_id,signingAddress:row.signing_address,payoutType:row.payout_type,payoutAddress:row.payout_address,verificationStatus:row.verification_status,verifiedAt:iso(row.verified_at)}; }
+export function mapPayout(row: PayoutRow): PayoutProfile { return {userId:row.user_id,signingAddress:row.signing_address,payoutType:row.payout_type,payoutAddress:row.payout_address,verificationStatus:row.verification_status,verifiedAt:iso(row.verified_at),destinationChain:row.destination_chain,destinationAssetId:row.destination_asset_id,destinationAssetSymbol:row.destination_asset_symbol,destinationAssetDecimals:row.destination_asset_decimals,destinationAddress:row.destination_address,destinationVerification:row.destination_verification}; }
 
 const agreementSelect = `select * from payment_agreements`;
 export async function listAccessibleAgreements(userId:string,email:string) { const result=await database().query<AgreementRow>(`${agreementSelect} where organizer_user_id=$1 or payee_email=$2 order by created_at desc`,[userId,email]); return result.rows.map(mapAgreement); }
@@ -53,13 +53,13 @@ export async function bindPactAccount(userId:string,address:string) {
 }
 export async function pactAccountForUser(userId:string) { const row=await oneOrNull<{signing_address:string}>(`select signing_address from pact_accounts where user_id=$1`,[userId]);return row?{signingAddress:row.signing_address}:null; }
 
-export async function saveAcceptance(id:string,email:string,userId:string,address:string,signature:string,payout:{type:PayoutProfile["payoutType"];address:string}) {
+export async function saveAcceptance(id:string,email:string,userId:string,address:string,signature:string,payout:{type:PayoutProfile["payoutType"];address:string;preference:PayoutPreference}) {
   return transaction(async(client)=>{
     const result=await client.query<AgreementRow>(`select * from payment_agreements where id=$1 for update`,[id]); const current=result.rows[0];
     if(!current||current.payee_email!==email) return null;
     if(["acceptance_signed","registration_pending","active"].includes(current.status)) return mapAgreement(current);
     if(current.status!=="awaiting_acceptance") return null;
-    await client.query(`insert into payout_profiles(user_id,signing_address,payout_type,payout_address,verification_status,verified_at,updated_at) values($1,$2,$3,$4,'verified',now(),now()) on conflict(user_id) do update set signing_address=excluded.signing_address,payout_type=excluded.payout_type,payout_address=excluded.payout_address,verification_status='verified',verified_at=now(),updated_at=now()`,[userId,address,payout.type,payout.address]);
+    await client.query(`insert into payout_profiles(user_id,signing_address,payout_type,payout_address,verification_status,verified_at,updated_at,destination_chain,destination_asset_id,destination_asset_symbol,destination_asset_decimals,destination_address,destination_verification) values($1,$2,$3,$4,'verified',now(),now(),$5,$6,$7,$8,$9,$10) on conflict(user_id) do update set signing_address=excluded.signing_address,payout_type=excluded.payout_type,payout_address=excluded.payout_address,verification_status='verified',verified_at=now(),updated_at=now(),destination_chain=excluded.destination_chain,destination_asset_id=excluded.destination_asset_id,destination_asset_symbol=excluded.destination_asset_symbol,destination_asset_decimals=excluded.destination_asset_decimals,destination_address=excluded.destination_address,destination_verification=excluded.destination_verification`,[userId,address,payout.type,payout.address,payout.preference.chain,payout.preference.assetId,payout.preference.assetSymbol,payout.preference.assetDecimals,payout.preference.address,payout.preference.verification]);
     await client.query(`update invoices set status='issued',updated_at=now() where agreement_id=$1 and status='prepared'`,[id]);
     const updated=await client.query<AgreementRow>(`update payment_agreements set payee_user_id=$2,payee_address=$3,payee_signature=$4,status='acceptance_signed',registration_status='acceptance_signed',accepted_at=coalesce(accepted_at,now()),registration_error=null,updated_at=now() where id=$1 returning *`,[id,userId,address,bytes(signature)]);
     return mapAgreement(updated.rows[0]!);

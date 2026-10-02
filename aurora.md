@@ -45,14 +45,14 @@ Official references:
 
 ## 3. Network constraint
 
-Aurora's documented Persistent Deposit API accepts `destinationChain: "monad"`; it does not expose a Monad-testnet selector, EVM chain ID override, or documented sandbox. Pact is currently deployed on Monad Testnet, chain ID `10143`.
+Aurora's documented Persistent Deposit API accepts `destinationChain: "monad"`; it does not expose a Monad-testnet selector, EVM chain ID override, or documented sandbox. Pact's live contracts are now deployed on Monad mainnet, chain ID `143`.
 
 Therefore:
 
 - Aurora routing is feature-gated.
 - The server must confirm that the configured Aurora destination chain ID equals the event vault chain ID before requesting an address.
-- The current development fallback remains a direct USDC transfer to the Monad Testnet event vault.
-- Live Aurora routing must not be enabled until the Pact registry, vault factory, vaults, and verified USDC token are deployed on the Monad environment Aurora calls `monad`.
+- The development fallback remains a direct USDC transfer to the event vault.
+- Live Aurora routing remains feature-gated until the API key, origin asset identifier, refund reconciliation, and production route have passed an end-to-end mainnet test.
 
 This guard prevents a sponsor from sending real funds to an Aurora address whose destination does not match the event vault deployment.
 
@@ -114,7 +114,7 @@ AURORA_DESTINATION_RPC_URL=
 AURORA_DESTINATION_TOKEN_ADDRESS=
 ```
 
-`AURORA_INTENTS_ENABLED` stays `false` for the current Monad Testnet deployment.
+Keep `AURORA_INTENTS_ENABLED` and `AURORA_PAYOUTS_ENABLED` disabled until an Aurora API key and the production asset identifiers have been validated end to end against these mainnet contracts.
 
 ## 7. Implementation steps
 
@@ -169,10 +169,54 @@ When Aurora is unavailable or fails the safety gate, the sponsor page clearly ex
 
 ## 10. Current deployment status
 
-Pact currently has:
+Pact mainnet now has:
 
-- Monad Testnet agreement registry: `0xc2B0D2A7e858F13b349843fF87dBF4EBF9227F49`
-- Monad Testnet event-vault factory: `0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31`
-- Monad Testnet USDC: `0x534b2f3A21130d7a60830c2Df862319e593943A3`
+- Monad mainnet chain ID: `143`
+- Agreement registry: `0xc2B0D2A7e858F13b349843fF87dBF4EBF9227F49`
+- Route-aware event-vault factory: `0xF7602C048F8C7Cc5E8c514522D633eb9A16a3a1B`
+- Canonical USDC: `0x754704Bc059F8C67012fEd69BC8A327a5aafb603`
 
-These testnet addresses must not be supplied to Aurora's production `monad` destination until Aurora explicitly confirms that destination maps to Monad Testnet. Current official documentation does not make that claim.
+The registry address happens to match the previous testnet deployment because the deployer used the same nonce on both chains. Network identity must always include chain ID; the address alone is not sufficient.
+
+## 11. Outbound payee settlement
+
+Aurora is also Pact's cross-chain exit layer. The event vault remains the source of truth and always releases USDC on Monad; the payee chooses the destination chain, asset, and address during agreement acceptance.
+
+```text
+Payee confirms destination chain, asset, and address
+        ↓
+Organizer fully funds a scheduled payment
+        ↓
+Pact requests an exact-input Aurora quote
+        ↓
+Event vault sends USDC to the quote deposit address
+        ↓
+Aurora routes to the payee's chosen asset and chain
+        ↓
+Pact observes Aurora SUCCESS and destination transaction evidence
+        ↓
+Only then is the scheduled payment marked paid
+```
+
+Implementation rules:
+
+1. `refundTo` is always the event vault. It is never supplied by the browser.
+2. The quoted Aurora deposit address is the address in the organizer's typed payment authorization.
+3. Quotes are stored in `payout_route_quotes`, including expected output, minimum output, deadline, raw response, and destination transaction evidence.
+4. A successful Monad release changes the settlement to `routing`; it does not mark the obligation paid.
+5. `SUCCESS` changes it to `delivered` and increments the scheduled payment's paid amount exactly once.
+6. `REFUNDED` and `FAILED` clear the processing lock without crediting the payee.
+7. Direct Monad USDC settlement remains a separate `direct` mode and may become `confirmed` as soon as the vault release confirms.
+8. Cross-chain payout execution is controlled by `AURORA_PAYOUTS_ENABLED` and remains disabled on the current testnet deployment.
+
+Outbound configuration:
+
+```dotenv
+AURORA_PAYOUTS_ENABLED=false
+AURORA_PAYOUT_ORIGIN_ASSET_ID=
+AURORA_PAYOUT_SLIPPAGE_BPS=100
+```
+
+`PactEventVault.routePayment` now moves Aurora-bound value from allocated funds into `paymentRouting` and `agreementRouting`. It does not increment `paymentPaid` or `agreementPaid`. Direct Monad payouts continue to use `release`. Application reconciliation marks the database payment delivered only after Aurora reports destination success.
+
+Refund restoration still requires an explicit reconciliation design before live cross-chain payouts are enabled. Until that is implemented and tested, both Aurora feature flags remain off even though the mainnet registry and route-aware factory are deployed.

@@ -3,6 +3,7 @@ import { hashTypedData, keccak256, stringToHex, toBytes, type Address, type Hex 
 export const REGISTRY_DOMAIN_NAME = "PactAgreementRegistry";
 export const REGISTRY_DOMAIN_VERSION = "1";
 export const EVENT_VAULT_FACTORY_DOMAIN_NAME = "PactEventVaultFactory";
+export const EVENT_VAULT_DOMAIN_NAME = "PactEventVault";
 
 export function canonicalBytes32(value: string): Hex {
   return /^0x[0-9a-fA-F]{64}$/.test(value) ? value as Hex : keccak256(toBytes(value));
@@ -36,8 +37,45 @@ export const eventVaultAuthorizationTypes = {
   ],
 } as const;
 
+export const eventAllocationTypes = {
+  EventAllocation: [
+    { name: "agreementId", type: "bytes32" },
+    { name: "paymentId", type: "bytes32" },
+    { name: "amount", type: "uint256" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint64" },
+  ],
+} as const;
+
+export const eventPaymentReleaseTypes = {
+  EventPaymentRelease: [
+    { name: "agreementId", type: "bytes32" },
+    { name: "paymentId", type: "bytes32" },
+    { name: "payoutAddress", type: "address" },
+    { name: "amount", type: "uint256" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint64" },
+  ],
+} as const;
+
+export const eventPaymentRouteTypes = {
+  EventPaymentRoute: [
+    { name: "agreementId", type: "bytes32" },
+    { name: "paymentId", type: "bytes32" },
+    { name: "routeId", type: "bytes32" },
+    { name: "depositAddress", type: "address" },
+    { name: "amount", type: "uint256" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint64" },
+  ],
+} as const;
+
 export function eventVaultFactoryDomain(chainId: number, verifyingContract: Address) {
   return { name: EVENT_VAULT_FACTORY_DOMAIN_NAME, version: "1", chainId, verifyingContract } as const;
+}
+
+export function eventVaultDomain(chainId: number, verifyingContract: Address) {
+  return { name: EVENT_VAULT_DOMAIN_NAME, version: "1", chainId, verifyingContract } as const;
 }
 
 export function registryDomain(chainId: number, verifyingContract: Address) {

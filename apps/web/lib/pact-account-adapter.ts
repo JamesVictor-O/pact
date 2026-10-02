@@ -4,8 +4,8 @@ import { createPasskeyWithPrfOutput, createSecp256k1SigningSession, getPasskeyPr
 import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 import { toViemAccount } from "@category-labs/mera/viem";
 import { hexToBytes, keccak256 } from "viem";
-import { acceptanceTypes, canonicalBytes32, currencyBytes32, eventVaultAuthorizationTypes, eventVaultFactoryDomain, proposalDigest, proposalTypes, registryDomain } from "./agreement-typed-data";
-import type { Invoice, PaymentAgreement } from "./pact-types";
+import { acceptanceTypes, canonicalBytes32, currencyBytes32, eventAllocationTypes, eventPaymentReleaseTypes, eventPaymentRouteTypes, eventVaultAuthorizationTypes, eventVaultDomain, eventVaultFactoryDomain, proposalDigest, proposalTypes, registryDomain } from "./agreement-typed-data";
+import type { Invoice, PaymentAgreement, VaultExecutionChallenge } from "./pact-types";
 
 const LEGACY_CREDENTIAL_KEY = "pact.mera-credential.v1";
 const credentialKey = (userId:string) => `pact.mera-credential.v2:${userId}`;
@@ -52,6 +52,15 @@ export class PactAccountAdapter {
     return this.withAccount(unlocked.prfOutput,async account=>({address:account.address,signature:await account.signTypedData({domain:eventVaultFactoryDomain(chainId,address),primaryType:"EventVaultAuthorization",types:eventVaultAuthorizationTypes,message:{eventId:canonicalBytes32(eventId),organizer:account.address,deadline:BigInt(Math.floor(new Date(deadline).getTime()/1000))}})}));
   }
 
+  async signAllocation(userId:string,challenge:VaultExecutionChallenge) {
+    return this.signVaultInstruction(userId,challenge,"EventAllocation");
+  }
+
+  async signPaymentRelease(userId:string,challenge:VaultExecutionChallenge) {
+    if(!challenge.payoutAddress)throw new Error("The verified payout destination is missing");
+    return this.signVaultInstruction(userId,challenge,"EventPaymentRelease");
+  }
+
   async signAgreement(userId:string, agreement: PaymentAgreement, invoice: Invoice) {
     const stored = JSON.parse(localStorage.getItem(credentialKey(userId.trim().toLowerCase())) ?? "null") as StoredCredential | null;
     if (!stored) throw new Error("Secure Pact account is not configured");
@@ -69,6 +78,23 @@ export class PactAccountAdapter {
   }
 
   private registry(){const address=process.env.NEXT_PUBLIC_PACT_AGREEMENT_REGISTRY_ADDRESS as `0x${string}`|undefined;if(!address)throw new Error("Agreement registry is not configured");return{address,chainId:Number(process.env.NEXT_PUBLIC_MONAD_CHAIN_ID??10143)};}
+
+  private async signVaultInstruction(userId:string,challenge:VaultExecutionChallenge,kind:"EventAllocation"|"EventPaymentRelease"){
+    const stored=JSON.parse(localStorage.getItem(credentialKey(userId.trim().toLowerCase()))??"null") as StoredCredential|null;
+    if(!stored)throw new Error("Secure Pact account is not configured");
+    const unlocked=await getPasskeyPrfOutput({rpId:window.location.hostname,credential:stored});
+    const chainId=Number(process.env.NEXT_PUBLIC_MONAD_CHAIN_ID??10143);
+    return this.withAccount(unlocked.prfOutput,async account=>{
+      if(account.address.toLowerCase()!==challenge.organizer.toLowerCase())throw new Error("This passkey does not control the event account");
+      const common={agreementId:canonicalBytes32(challenge.agreementId),paymentId:canonicalBytes32(challenge.paymentId),amount:BigInt(challenge.amountAtomic),nonce:BigInt(challenge.nonce),deadline:BigInt(Math.floor(new Date(challenge.deadline).getTime()/1000))};
+      const signature=kind==="EventAllocation"
+        ?await account.signTypedData({domain:eventVaultDomain(chainId,challenge.vaultAddress),primaryType:"EventAllocation",types:eventAllocationTypes,message:common})
+        :challenge.settlementMode==="aurora"&&challenge.payoutRouteQuoteId
+          ?await account.signTypedData({domain:eventVaultDomain(chainId,challenge.vaultAddress),primaryType:"EventPaymentRoute",types:eventPaymentRouteTypes,message:{...common,routeId:canonicalBytes32(challenge.payoutRouteQuoteId),depositAddress:challenge.payoutAddress!}})
+          :await account.signTypedData({domain:eventVaultDomain(chainId,challenge.vaultAddress),primaryType:"EventPaymentRelease",types:eventPaymentReleaseTypes,message:{...common,payoutAddress:challenge.payoutAddress!}});
+      return{...challenge,signature};
+    });
+  }
 
   private async bindAccount(address:`0x${string}`){const token=getAuthToken();if(!token)throw new Error("Your authenticated session is unavailable");const response=await fetch("/api/pact-account",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${token}`},body:JSON.stringify({address})});if(!response.ok){const body=await response.json().catch(()=>({})) as {error?:string};throw new Error(body.error??"Pact could not bind your Mera account");}}
 

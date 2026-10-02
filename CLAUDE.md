@@ -740,11 +740,10 @@ Always inspect the installed SDK and current official documentation before chang
 # 20. Current Known Missing Pieces
 
 Still incomplete:
-- sponsor receivable invoices
-- Aurora funding execution
-- actual payee payment execution
 - refunds
-- production transaction receipts
+- automated/background reconciliation for submitted allocation and payment transactions
+- production Aurora enablement (blocked on a destination that matches Pact's deployed Monad environment)
+- production transaction explorer links and operational alerting
 
 Implemented:
 - PostgreSQL financial and agreement repositories
@@ -753,6 +752,11 @@ Implemented:
 - deployed PactAgreementRegistry integration
 - Mera payout accounts and optional externally verified payout destinations
 - server-backed allocations from received funding to scheduled payments
+- sponsor receivable invoices and direct-USDC receipt verification
+- event-scoped PactEventVault deployment and funding
+- organizer-signed onchain allocation through the server relayer
+- organizer-signed payee release through the server relayer
+- confirmation-backed allocation and payment states with safe retry records
 
 ---
 
@@ -874,7 +878,7 @@ Aurora Labs funding
 → $3,000 Production deposit
 → $2,000 Venue
 
-The first server-backed allocation vertical slice is implemented. Allocation drives:
+The server-backed allocation vertical slice now reserves funds inside the event vault. Allocation drives:
 - funded amount
 - funding gap
 - available balance
@@ -901,7 +905,7 @@ Payments originate from Expense payment schedules.
 
 ## Actual Payment Execution
 
-Later:
+Implemented for the direct Monad USDC path:
 
 Organizer authorizes payment
 → Monad financial state verifies readiness
@@ -911,7 +915,7 @@ Organizer authorizes payment
 
 This should not be implemented as a fake “Mark as paid” toggle.
 
-Paid should eventually come from actual settlement state.
+Paid comes from a confirmed `PactEventVault.release` transaction. A failed or unconfirmed relayer attempt must never increment `paidAmount`.
 
 ## Aurora Funding Flow
 

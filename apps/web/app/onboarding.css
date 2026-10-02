@@ -358,7 +358,7 @@
 .payment-summary-grid article + article { border-left: 1px solid var(--line); }
 .payment-summary-grid p, .payment-summary-grid span { color: var(--muted); font-size: 10px; }
 .payment-summary-grid strong { font-size: clamp(20px, 2vw, 28px); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
-.payment-readiness { margin-top: 52px; padding: 28px; border: 1px solid var(--line); border-radius: var(--radius-card); display: grid; grid-template-columns: 48px 1fr; gap: 20px; background: var(--surface); }
+.payment-readiness { margin-top: 52px; padding: 28px; border: 1px solid var(--line); border-radius: var(--radius-card); display: grid; grid-template-columns: 48px minmax(0,1fr) auto; gap: 20px; align-items: center; background: var(--surface); }
 .payment-readiness-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; }
 .payment-readiness-icon svg { width: 20px; height: 20px; }
 .payment-readiness.is-ready .payment-readiness-icon { background: var(--mint); color: var(--success); }
@@ -366,6 +366,13 @@
 .payment-readiness h2 { margin-top: 6px; font-size: 22px; letter-spacing: -.02em; }
 .payment-readiness div > p:last-child, .payment-readiness ul { margin-top: 8px; color: var(--muted); font-size: 11px; }
 .payment-readiness ul { padding-left: 18px; display: grid; gap: 5px; }
+.payment-release-button { min-width: 190px; justify-content: center; }
+.payment-execution-state { margin-top: 16px; padding: 20px 24px; border: 1px solid var(--line); border-radius: 20px; display: flex; justify-content: space-between; align-items: center; gap: 24px; background: var(--surface); }
+.payment-execution-state > div { min-width: 0; }
+.payment-execution-state h2 { margin-top: 4px; font-size: 18px; }
+.payment-execution-state code { display: block; margin-top: 9px; max-width: 620px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.payment-execution-state.confirmed { border-color: #b9ddc7; }
+.payment-execution-state.failed { border-color: #e7b4ad; background: var(--error-soft); }
 .payment-detail-grid { margin-top: 24px; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, .7fr); gap: 24px; }
 .payment-funding-panel > div { align-items: flex-start; }
 .payment-funding-panel > div > span { display: grid; gap: 5px; }
@@ -536,8 +543,11 @@
 .allocation-row { min-height: 64px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr 44px; align-items: center; }
 .allocation-row > a, .payment-allocation-sources > a { min-height: 64px; padding-block: 12px; display: grid; grid-template-columns: 1fr auto 20px; align-items: center; gap: 14px; color: var(--ink); }
 .allocation-row > button { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
-.allocation-row > button:hover { background: var(--soft); color: var(--error); }
+.allocation-row > button:hover { background: var(--soft); color: var(--accent); }
 .allocation-row > button svg { width: 16px; }
+.allocation-row:not(:has(> button)) { grid-template-columns: 1fr; }
+.allocation-row.allocation-failed > a small { color: var(--error); }
+.allocation-row.allocation-submitted > a small, .allocation-row.allocation-authorization_signed > a small { color: var(--accent); }
 .allocation-row > a > span, .payment-allocation-sources > a > span { display: grid; gap: 3px; }
 .allocation-list small, .payment-allocation-sources small { color: var(--muted); font-size: 10px; }
 .allocation-list svg, .payment-allocation-sources svg { width: 16px; color: var(--muted); }
@@ -682,6 +692,9 @@
   .payment-summary-grid { grid-template-columns: 1fr; }
   .payment-summary-grid article + article { border-left: 0; border-top: 1px solid var(--line); }
   .payment-readiness { padding: 22px 18px; grid-template-columns: 40px 1fr; border-radius: 22px; }
+  .payment-readiness .payment-release-button { grid-column: 1 / -1; width: 100%; }
+  .payment-execution-state { align-items: stretch; flex-direction: column; }
+  .payment-execution-state .app-secondary-button { width: 100%; justify-content: center; }
   .payment-readiness-icon { width: 40px; height: 40px; }
   .payment-funding-panel > div { flex-direction: column; }
   .payment-value-flow { padding: 22px 18px; border-radius: 22px; }

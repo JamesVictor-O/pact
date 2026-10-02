@@ -113,9 +113,30 @@ export interface AuroraDepositRoute {
 
 export interface PaymentSettlement {
   id: string; eventId: string; agreementId: string; paymentId: string; payoutAddress: string; settlementTokenAddress: string;
-  amountAtomic: string; amount: number; transactionHash?: string; status: "authorization_signed" | "submitted" | "confirmed" | "failed";
+  amountAtomic: string; amount: number; transactionHash?: string; status: "authorization_signed" | "submitted" | "confirmed" | "routing" | "delivered" | "refunded" | "failed";
+  settlementMode?: "direct" | "aurora"; payoutRouteQuoteId?: string;
   failureMessage?: string; confirmedAt?: string; createdAt: string;
 }
+
+export type VaultExecutionChallenge = {
+  vaultAddress: `0x${string}`;
+  organizer: `0x${string}`;
+  agreementId: string;
+  paymentId: string;
+  amount: number;
+  amountAtomic: string;
+  nonce: string;
+  deadline: string;
+  payoutAddress?: `0x${string}`;
+  payoutRouteQuoteId?: string;
+  settlementMode?: "direct" | "aurora";
+  destinationChain?: string;
+  destinationAssetSymbol?: string;
+  expectedOutput?: string;
+  minimumOutput?: string;
+};
+
+export type VaultExecutionAuthorization = VaultExecutionChallenge & { signature: `0x${string}` };
 
 export interface Expense {
   id: string;
@@ -171,7 +192,12 @@ export interface Invoice {
 export interface PayoutProfile {
   userId: string; signingAddress: string; payoutType: "mera" | "external_wallet"; payoutAddress: string;
   verificationStatus: "pending" | "verified"; verifiedAt?: string;
+  destinationChain: string; destinationAssetId: string; destinationAssetSymbol: string; destinationAssetDecimals: number;
+  destinationAddress: string; destinationVerification: "pact_account" | "wallet_signature" | "payee_confirmation";
 }
+
+export type PayoutAssetOption={assetId:string;blockchain:string;symbol:string;decimals:number;contractAddress?:string};
+export type PayoutPreference={chain:string;assetId:string;assetSymbol:string;assetDecimals:number;address:string;verification:"pact_account"|"wallet_signature"|"payee_confirmation"};
 
 export interface ExpensePayment {
   /** A scheduled obligation. Actual vendor transfers will use a separate execution record in a later phase. */
@@ -194,6 +220,9 @@ export interface Allocation {
   fundingSourceId: string;
   paymentId: string;
   amount: number;
+  executionStatus?: "legacy_unconfirmed" | "authorization_signed" | "submitted" | "confirmed" | "failed" | "reversed";
+  transactionHash?: string;
+  executionError?: string;
   createdAt: string;
 }
 
