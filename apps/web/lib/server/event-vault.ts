@@ -14,13 +14,15 @@ function config() {
   const rpc = process.env.MONAD_RPC_URL;
   const factory = process.env.PACT_EVENT_VAULT_FACTORY_ADDRESS as Address | undefined;
   const key = process.env.PACT_RELAYER_PRIVATE_KEY as Hex | undefined;
-  if (!rpc || !factory || !key) throw new Error("Event vault relayer is not configured");
-  return { rpc, factory, key };
+  const chainId=Number(process.env.MONAD_CHAIN_ID);
+  if (!rpc || !factory || !key || !Number.isSafeInteger(chainId)) throw new Error("Event vault relayer is not configured");
+  return { rpc, factory, key, chainId };
 }
 
 export async function provisionEventVault(id: string, userId: string) {
+  const configured=config();
   const claimed = await transaction(async (client) => {
-    const result = await client.query<EventRow & {vault_authorization_signature:Buffer|null;vault_authorization_deadline:Date|null}>(`select * from events where id=$1 and owner_user_id=$2 for update`, [id, userId]);
+    const result = await client.query<EventRow & {vault_authorization_signature:Buffer|null;vault_authorization_deadline:Date|null}>(`select * from events where id=$1 and owner_user_id=$2 and network_chain_id=$3 for update`, [id, userId, configured.chainId]);
     const row = result.rows[0];
     if (!row) return null;
     if (row.vault_status === "ready") return { row, ownsAttempt: false, transactionHash: row.vault_transaction_hash as Hex|undefined };
@@ -38,11 +40,11 @@ export async function provisionEventVault(id: string, userId: string) {
   if (!claimed) return null;
   if (claimed.row.vault_status === "ready") return mapEvent(claimed.row);
   if (!claimed.ownsAttempt) {
-    const current = await database().query<EventRow>(`select * from events where id=$1 and owner_user_id=$2`, [id, userId]);
+    const current = await database().query<EventRow>(`select * from events where id=$1 and owner_user_id=$2 and network_chain_id=$3`, [id, userId, configured.chainId]);
     return current.rows[0] ? mapEvent(current.rows[0]) : null;
   }
   try {
-    const c = config();
+    const c = configured;
     const eventId = canonicalBytes32(id);
     const authorizationDeadline = claimed.row.vault_authorization_deadline;
     const authorizationSignature = claimed.row.vault_authorization_signature;

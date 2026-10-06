@@ -5,15 +5,19 @@ import { privateKeyToAccount } from "viem/accounts";
 import { canonicalBytes32, eventAllocationTypes, eventPaymentReleaseTypes, eventPaymentRouteTypes, eventVaultDomain } from "../agreement-typed-data";
 import type { Allocation, PaymentSettlement, VaultExecutionAuthorization, VaultExecutionChallenge } from "../pact-types";
 import { database, oneOrNull, transaction } from "./database";
-import { auroraPayoutAvailability, createAuroraPayoutQuote, getAuroraPayoutStatus, submitAuroraPayoutDeposit } from "./aurora-payout";
+import { auroraPayoutAvailability, createAuroraPayoutQuote, getAuroraPayoutStatus, submitAuroraPayoutDeposit, type AuroraPayoutQuote } from "./aurora-payout";
 
 const vaultAbi=parseAbi([
   "function organizerNonce() view returns(uint256)",
   "function paymentAllocated(bytes32 paymentId) view returns(uint256)",
   "function paymentPaid(bytes32 paymentId) view returns(uint256)",
+  "function routeResolver() view returns(address)",
   "function allocate(bytes32 agreementId,bytes32 paymentId,uint256 amount,uint256 nonce,uint64 deadline,bytes organizerSignature)",
   "function release(bytes32 agreementId,bytes32 paymentId,address payoutAddress,uint256 amount,uint256 nonce,uint64 deadline,bytes organizerSignature)",
   "function routePayment(bytes32 agreementId,bytes32 paymentId,bytes32 routeId,address depositAddress,uint256 amount,uint256 nonce,uint64 deadline,bytes organizerSignature)",
+  "function routeStatus(bytes32 routeId) view returns(uint8)",
+  "function resolveRouteDelivered(bytes32 routeId)",
+  "function resolveRouteRefunded(bytes32 routeId)",
 ]);
 
 type ExecutionContext={
@@ -50,10 +54,20 @@ async function context(paymentId:string,userId:string,sourceId?:string){
     left join invoices i on i.agreement_id=a.id and i.direction='payable'
     left join payout_profiles pp on pp.user_id=a.payee_user_id
     left join funding_sources f on f.id=$3 and f.event_id=e.id
-    where p.id=$1 and e.owner_user_id=$2`,[paymentId,userId,sourceId??null]);
+    where p.id=$1 and e.owner_user_id=$2 and e.network_chain_id=$4`,[paymentId,userId,sourceId??null,config().chainId]);
 }
 
 async function nonceFor(vault:Address){const c=config();return createPublicClient({transport:http(c.rpc)}).readContract({address:vault,abi:vaultAbi,functionName:"organizerNonce"});}
+async function requireRouteResolutionVault(vault:Address){
+  const c=config(),expected=privateKeyToAccount(c.key).address;
+  try{
+    const resolver=await createPublicClient({transport:http(c.rpc)}).readContract({address:vault,abi:vaultAbi,functionName:"routeResolver"});
+    if(resolver.toLowerCase()!==expected.toLowerCase())throw new Error("This event account uses a different payout resolver");
+  }catch(error){
+    if(error instanceof Error&&error.message==="This event account uses a different payout resolver")throw error;
+    throw new Error("This event account predates cross-chain payout finalization. Create or migrate the event before routing a payout");
+  }
+}
 function deadline(){return new Date(Date.now()+15*60*1000).toISOString();}
 function challengeFrom(c:ExecutionContext,amountMinor:number,nonce:bigint,payoutAddress?:string):VaultExecutionChallenge{
   const cfg=config();return{vaultAddress:c.vault_address as Address,organizer:c.organizer_address as Address,agreementId:c.agreement_id,paymentId:c.payment_id,amount:amountMinor/100,amountAtomic:(BigInt(amountMinor)*cfg.unit).toString(),nonce:nonce.toString(),deadline:deadline(),payoutAddress:payoutAddress as Address|undefined};
@@ -101,7 +115,7 @@ export async function executeAllocation(sourceId:string,paymentId:string,amount:
 }
 
 export async function relayAllocation(id:string,userId:string){
-  const row=await oneOrNull<AllocationRow&{vault_address:string;owner_user_id:string;agreement_id:string;amount_atomic:string;organizer_nonce:string;authorization_signature:Buffer;authorization_deadline:Date}>(`select a.*,e.vault_address,e.owner_user_id from allocations a join events e on e.id=a.event_id where a.id=$1 and e.owner_user_id=$2`,[id,userId]);
+  const row=await oneOrNull<AllocationRow&{vault_address:string;owner_user_id:string;agreement_id:string;amount_atomic:string;organizer_nonce:string;authorization_signature:Buffer;authorization_deadline:Date}>(`select a.*,e.vault_address,e.owner_user_id from allocations a join events e on e.id=a.event_id where a.id=$1 and e.owner_user_id=$2 and e.network_chain_id=$3`,[id,userId,config().chainId]);
   if(!row)return null;if(row.execution_status==="confirmed")return allocationMap(row);
   try{const c=config(),pub=createPublicClient({transport:http(c.rpc)}),wallet=createWalletClient({account:privateKeyToAccount(c.key),transport:http(c.rpc)});let hash=row.transaction_hash as Hex|undefined;
     if(!hash){hash=await wallet.writeContract({chain:null,address:row.vault_address as Address,abi:vaultAbi,functionName:"allocate",args:[canonicalBytes32(row.agreement_id),canonicalBytes32(row.payment_id),BigInt(row.amount_atomic),BigInt(row.organizer_nonce),BigInt(Math.floor(row.authorization_deadline.getTime()/1000)),`0x${row.authorization_signature.toString("hex")}` as Hex]});await database().query(`update allocations set execution_status='submitted',transaction_hash=$2,execution_error=null,updated_at=now() where id=$1`,[id,hash]);}
@@ -120,6 +134,7 @@ export async function createPaymentChallenge(paymentId:string,userId:string){
   const nonce=await nonceFor(c.vault_address as Address),base=challengeFrom(c,remaining,nonce,c.payout_address);
   const routed=c.destination_chain?.toLowerCase()!=="monad"||c.destination_asset_id!=="monad:usdc";
   if(!routed)return{...base,settlementMode:"direct" as const};
+  await requireRouteResolutionVault(c.vault_address as Address);
   const available=auroraPayoutAvailability();if(!available.enabled)throw new Error(available.reason??"Cross-chain payouts are not available");
   if(!c.destination_asset_id||!c.destination_address||!c.destination_chain||!c.destination_asset_symbol)throw new Error("The payee payout preference is incomplete");
   const existing=await oneOrNull<RouteRow>(`select * from payout_route_quotes where payment_id=$1 and status='quoted' and quote_deadline>now()+interval '60 seconds' order by created_at desc limit 1`,[paymentId]);
@@ -140,14 +155,47 @@ export async function executePayment(paymentId:string,userId:string,authorizatio
 
 export async function relayPayment(id:string,userId:string){
   const row=await oneOrNull<SettlementRow&{vault_address:string;owner_user_id:string;organizer_nonce:string;authorization_signature:Buffer;authorization_deadline:Date}>(`select s.*,e.vault_address,e.owner_user_id from payment_settlements s join events e on e.id=s.event_id where s.id=$1 and e.owner_user_id=$2`,[id,userId]);if(!row)return null;if(row.status==="routing")return syncRoutedPayment(id,userId);if(row.status==="confirmed"||row.status==="delivered")return settlementMap(row);
+  let routeTransferConfirmed=false;
   try{const c=config(),pub=createPublicClient({transport:http(c.rpc)}),wallet=createWalletClient({account:privateKeyToAccount(c.key),transport:http(c.rpc)});let hash=row.transaction_hash as Hex|undefined;
     if(!hash){const signature=`0x${row.authorization_signature.toString("hex")}` as Hex,common=[canonicalBytes32(row.agreement_id),canonicalBytes32(row.payment_id)] as const;hash=row.settlement_mode==="aurora"&&row.payout_route_quote_id?await wallet.writeContract({chain:null,address:row.vault_address as Address,abi:vaultAbi,functionName:"routePayment",args:[...common,canonicalBytes32(row.payout_route_quote_id),row.payout_address as Address,BigInt(row.amount_atomic),BigInt(row.organizer_nonce),BigInt(Math.floor(row.authorization_deadline.getTime()/1000)),signature]}):await wallet.writeContract({chain:null,address:row.vault_address as Address,abi:vaultAbi,functionName:"release",args:[...common,row.payout_address as Address,BigInt(row.amount_atomic),BigInt(row.organizer_nonce),BigInt(Math.floor(row.authorization_deadline.getTime()/1000)),signature]});await database().query(`update payment_settlements set status='submitted',transaction_hash=$2,failure_message=null,updated_at=now() where id=$1`,[id,hash]);}
-    const receipt=await pub.waitForTransactionReceipt({hash,confirmations:Number(process.env.MONAD_CONFIRMATIONS??1),timeout:120_000});if(receipt.status!=="success")throw new Error("Payment transaction reverted");
-    if(row.settlement_mode==="aurora"&&row.payout_route_quote_id){await submitAuroraPayoutDeposit(hash,row.payout_address);const routing=await oneOrNull<SettlementRow>(`update payment_settlements set status='routing',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 returning *`,[id]);await database().query(`update payout_route_quotes set status='routing',updated_at=now() where id=$1`,[row.payout_route_quote_id]);return settlementMap(routing!);}
+    const receipt=await pub.waitForTransactionReceipt({hash,confirmations:Number(process.env.MONAD_CONFIRMATIONS??1),timeout:120_000});if(receipt.status!=="success")throw new Error("Payment transaction reverted");routeTransferConfirmed=row.settlement_mode==="aurora";
+    if(row.settlement_mode==="aurora"&&row.payout_route_quote_id){const route=await oneOrNull<{raw_quote:AuroraPayoutQuote}>(`select raw_quote from payout_route_quotes where id=$1 and event_id=$2`,[row.payout_route_quote_id,row.event_id]);if(!route?.raw_quote)throw new Error("The saved Aurora quote is missing");await submitAuroraPayoutDeposit(hash,row.payout_address,route.raw_quote);const routing=await oneOrNull<SettlementRow>(`update payment_settlements set status='routing',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 returning *`,[id]);await database().query(`update payout_route_quotes set status='routing',last_error=null,updated_at=now() where id=$1`,[row.payout_route_quote_id]);return settlementMap(routing!);}
     const confirmed=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='confirmed',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 and status<>'confirmed' returning *`,[id]);if(updated.rows[0]){await db.query(`update expense_payments set paid_amount_minor=least(amount_minor,paid_amount_minor+$2),processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id,row.amount_minor]);await db.query(`update invoices set status='paid',paid_at=coalesce(paid_at,now()),updated_at=now() where agreement_id=$1 and not exists(select 1 from expense_payments p join expenses x on x.id=p.expense_id where x.id=(select expense_id from payment_agreements where id=$1) and p.paid_amount_minor<p.amount_minor)`,[row.agreement_id]);}return updated.rows[0]??row;});return settlementMap(confirmed);
-  }catch(error){const message=error instanceof Error?error.message:"Payment failed";const failed=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='failed',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,message.slice(0,500)]);await db.query(`update expense_payments set processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id]);return updated.rows[0]!;});return settlementMap(failed);}
+  }catch(error){const message=error instanceof Error?error.message:"Payment failed";if(routeTransferConfirmed){const pending=await oneOrNull<SettlementRow>(`update payment_settlements set status='submitted',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,message.slice(0,500)]);return settlementMap(pending!);}const failed=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='failed',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,message.slice(0,500)]);await db.query(`update expense_payments set processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id]);return updated.rows[0]!;});return settlementMap(failed);}
 }
 
-export async function syncRoutedPayment(id:string,userId:string){const row=await oneOrNull<SettlementRow&{owner_user_id:string;deposit_address:string}>(`select s.*,e.owner_user_id,r.deposit_address from payment_settlements s join events e on e.id=s.event_id join payout_route_quotes r on r.id=s.payout_route_quote_id where s.id=$1 and e.owner_user_id=$2`,[id,userId]);if(!row)return null;if(row.settlement_mode!=="aurora"||!row.payout_route_quote_id)return settlementMap(row);if(["delivered","refunded","failed"].includes(row.status))return settlementMap(row);const remote=await getAuroraPayoutStatus(row.deposit_address),tx=remote.swapDetails?.destinationChainTxHashes?.[0];if(remote.status==="SUCCESS"){const delivered=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='delivered',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 and status<>'delivered' returning *`,[id]);await db.query(`update payout_route_quotes set status='delivered',destination_transaction_hash=$2,destination_explorer_url=$3,last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id,tx?.hash??null,tx?.explorerUrl??null]);if(updated.rows[0])await db.query(`update expense_payments set paid_amount_minor=least(amount_minor,paid_amount_minor+$2),processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id,row.amount_minor]);return updated.rows[0]??row;});return settlementMap(delivered);}if(remote.status==="REFUNDED"||remote.status==="FAILED"){const next=remote.status==="REFUNDED"?"refunded":"failed",message=remote.swapDetails?.refundReason??`Aurora route ${next}`;const updated=await oneOrNull<SettlementRow>(`update payment_settlements set status=$2,failure_message=$3,updated_at=now() where id=$1 returning *`,[id,next,message]);await database().query(`update payout_route_quotes set status=$2,last_error=$3,last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id,next,message]);await database().query(`update expense_payments set processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id]);return settlementMap(updated!);}await database().query(`update payout_route_quotes set last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id]);return settlementMap(row);}
+async function resolveVaultRoute(vaultAddress:string,routeId:string,outcome:"delivered"|"refunded"){
+  const c=config(),publicClient=createPublicClient({transport:http(c.rpc)}),wallet=createWalletClient({account:privateKeyToAccount(c.key),transport:http(c.rpc)}),canonicalRouteId=canonicalBytes32(routeId);
+  const expected=outcome==="delivered"?2:3;
+  const current=Number(await publicClient.readContract({address:vaultAddress as Address,abi:vaultAbi,functionName:"routeStatus",args:[canonicalRouteId]}));
+  if(current===expected)return;
+  if(current!==1)throw new Error(`The event vault route cannot be marked ${outcome} from its current state`);
+  const hash=await wallet.writeContract({chain:null,address:vaultAddress as Address,abi:vaultAbi,functionName:outcome==="delivered"?"resolveRouteDelivered":"resolveRouteRefunded",args:[canonicalRouteId]});
+  const receipt=await publicClient.waitForTransactionReceipt({hash,confirmations:Number(process.env.MONAD_CONFIRMATIONS??1),timeout:120_000});
+  if(receipt.status!=="success")throw new Error(`The event vault could not finalize the ${outcome} route`);
+}
+
+export async function syncRoutedPayment(id:string,userId:string){
+  const row=await oneOrNull<SettlementRow&{owner_user_id:string;deposit_address:string;vault_address:string}>(`select s.*,e.owner_user_id,e.vault_address,r.deposit_address from payment_settlements s join events e on e.id=s.event_id join payout_route_quotes r on r.id=s.payout_route_quote_id where s.id=$1 and e.owner_user_id=$2`,[id,userId]);
+  if(!row)return null;
+  if(row.settlement_mode!=="aurora"||!row.payout_route_quote_id)return settlementMap(row);
+  if(["delivered","refunded"].includes(row.status))return settlementMap(row);
+  const remote=await getAuroraPayoutStatus(row.deposit_address),tx=remote.swapDetails?.destinationChainTxHashes?.[0];
+  if(remote.status==="SUCCESS"){
+    if(!tx?.hash)throw new Error("Aurora reports success without destination transaction evidence");
+    await resolveVaultRoute(row.vault_address,row.payout_route_quote_id,"delivered");
+    const delivered=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='delivered',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 and status<>'delivered' returning *`,[id]);await db.query(`update payout_route_quotes set status='delivered',destination_transaction_hash=$2,destination_explorer_url=$3,last_error=null,last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id,tx.hash,tx.explorerUrl??null]);if(updated.rows[0]){await db.query(`update expense_payments set paid_amount_minor=least(amount_minor,paid_amount_minor+$2),processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id,row.amount_minor]);await db.query(`update invoices set status='paid',paid_at=coalesce(paid_at,now()),updated_at=now() where agreement_id=$1 and not exists(select 1 from expense_payments p join expenses x on x.id=p.expense_id where x.id=(select expense_id from payment_agreements where id=$1) and p.paid_amount_minor<p.amount_minor)`,[row.agreement_id]);}return updated.rows[0]??row;});return settlementMap(delivered);
+  }
+  if(remote.status==="REFUNDED"){
+    await resolveVaultRoute(row.vault_address,row.payout_route_quote_id,"refunded");
+    const detail=remote.swapDetails?.refundReason??"Aurora returned the route funds";
+    const refunded=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='refunded',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,detail.slice(0,500)]);await db.query(`update payout_route_quotes set status='refunded',last_error=$2,last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id,detail.slice(0,500)]);await db.query(`update expense_payments set processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id]);return updated.rows[0]!;});return settlementMap(refunded);
+  }
+  if(remote.status==="FAILED"){
+    const detail=remote.swapDetails?.refundReason??"Aurora reports a failed route and Pact is waiting for the refund";
+    const failed=await oneOrNull<SettlementRow>(`update payment_settlements set status='failed',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,detail.slice(0,500)]);await database().query(`update payout_route_quotes set status='failed',last_error=$2,last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id,detail.slice(0,500)]);return settlementMap(failed!);
+  }
+  await database().query(`update payout_route_quotes set last_error=null,last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id]);return settlementMap(row);
+}
 
 export async function paymentExecutionState(paymentId:string,userId:string){const rows=await database().query<SettlementRow>(`select s.* from payment_settlements s join events e on e.id=s.event_id where s.payment_id=$1 and e.owner_user_id=$2 order by s.created_at desc`,[paymentId,userId]);return rows.rows.map(settlementMap);}

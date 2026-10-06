@@ -6,8 +6,7 @@ import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
-import { financialApi } from "../../lib/financial-api";
-import { listAgreements } from "../../lib/agreement-api";
+import { destinationForAuthIntent } from "../../lib/auth-routing";
 import { usePactAuth } from "../components/PactAuthProvider";
 
 export default function AuthEntry({ intent }: { intent: "organizer" | "payee" }) {
@@ -27,10 +26,8 @@ export default function AuthEntry({ intent }: { intent: "organizer" | "payee" })
     if (user && (intent === "organizer" || continueAfterAuthentication.current)) void finishAuthentication(user);
   }, [user?.id, intent]);
 
-  async function finishAuthentication(user: Awaited<ReturnType<typeof authClient.signInWithEmail>>) {
-    const events = isDynamicAuthConfigured ? await financialApi.listEvents().catch(()=>[]) : [];
-    const pendingAgreements = isDynamicAuthConfigured ? await listAgreements().catch(()=>[]) : [];
-    const destination = intent === "payee" ? "/agreements" : events.length > 0 ? "/dashboard" : pendingAgreements.length > 0 ? "/agreements" : "/events/new";
+  async function finishAuthentication(_user: Awaited<ReturnType<typeof authClient.signInWithEmail>>) {
+    const destination = destinationForAuthIntent(intent);
     if (isDynamicAuthConfigured) router.replace(destination);
     else window.location.assign(destination);
   }

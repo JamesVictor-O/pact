@@ -45,6 +45,11 @@ forge script contracts/script/DeployPactEventVaultFactory.s.sol:DeployPactEventV
 Store the deployment as `PACT_EVENT_VAULT_FACTORY_ADDRESS` and
 `NEXT_PUBLIC_PACT_EVENT_VAULT_FACTORY_ADDRESS`.
 
+The deployment also requires `PACT_ROUTE_RESOLVER_ADDRESS`. Set it to the public
+address controlled by the server relayer key. The resolver can only close an
+organizer-authorized cross-chain route as delivered or refunded; it cannot move
+funds or modify the route recipient or amount.
+
 ## Legacy shared treasury
 
 `PactTreasury` is retained for records created before event vaults. It keeps

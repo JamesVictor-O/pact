@@ -103,18 +103,19 @@ class BrowserEventRepository implements EventRepository {
 
   listByOwner(ownerId: string): PactEvent[] {
     return this.listAll()
-      .filter((event) => event.ownerId === ownerId)
+      .filter((event) => event.ownerId === ownerId && (event.networkChainId ?? 10143) === Number(process.env.NEXT_PUBLIC_MONAD_CHAIN_ID ?? 143))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   findById(eventId: string): PactEvent | null {
-    return this.listAll().find((event) => event.id === eventId) ?? null;
+    return this.listAll().find((event) => event.id === eventId && (event.networkChainId ?? 10143) === Number(process.env.NEXT_PUBLIC_MONAD_CHAIN_ID ?? 143)) ?? null;
   }
 
   create(ownerId: string, input: NewPactEvent): PactEvent {
     const event: PactEvent = {
       ...input,
       id: createId("event"),
+      networkChainId: Number(process.env.NEXT_PUBLIC_MONAD_CHAIN_ID ?? 143),
       ownerId,
       status: "active",
       vaultStatus: "not_started",

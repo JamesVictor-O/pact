@@ -49,7 +49,7 @@ export default function CreateEventForm() {
   useEffect(() => {
     if (!authReady) return;
     if (!authenticatedUser) {
-      router.replace("/auth");
+      router.replace("/auth?intent=organizer");
       return;
     }
     setUser(authenticatedUser);

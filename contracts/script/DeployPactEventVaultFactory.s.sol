@@ -9,8 +9,9 @@ contract DeployPactEventVaultFactory is Script {
         uint256 key = vm.envUint("PACT_DEPLOYER_PRIVATE_KEY");
         address registry = vm.envAddress("PACT_AGREEMENT_REGISTRY_ADDRESS");
         address token = vm.envAddress("PACT_SETTLEMENT_TOKEN_ADDRESS");
+        address routeResolver = vm.envAddress("PACT_ROUTE_RESOLVER_ADDRESS");
         vm.startBroadcast(key);
-        factory = new PactEventVaultFactory(registry, token);
+        factory = new PactEventVaultFactory(registry, token, routeResolver);
         vm.stopBroadcast();
     }
 }

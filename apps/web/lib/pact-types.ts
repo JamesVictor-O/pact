@@ -42,6 +42,7 @@ export interface PactUser {
 
 export interface PactEvent {
   id: string;
+  networkChainId: number;
   ownerId: string;
   name: string;
   date: string;

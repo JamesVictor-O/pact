@@ -188,6 +188,8 @@
 /* Funding */
 .funding-page > .app-banner { margin-bottom: 28px; }
 .funding-header, .funding-detail-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; }
+.funding-header > div { min-width: 0; }
+.funding-header > .app-primary-button { flex: 0 0 auto; }
 .funding-header h1, .funding-form-page h1, .funding-detail-header h1, .funding-error h1 { max-width: none; font-size: clamp(34px, 4vw, 44px); line-height: 1.08; letter-spacing: -.04em; }
 .funding-header > div > p:last-child, .funding-form-page > header > p:last-child { max-width: 620px; margin-top: 14px; color: var(--muted); }
 .funding-summary, .source-financial-summary { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); }
@@ -473,7 +475,7 @@
 .sponsor-transfer-detail strong { min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
 .sponsor-transfer-detail button { align-self: start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; cursor: pointer; font: inherit; font-size: 12px; }
 .sponsor-transfer-detail button svg { width: 14px; }
-.event-vault-card { display: grid; grid-template-columns: minmax(0,.9fr) minmax(420px,1.1fr); gap: 28px; margin-bottom: 28px; padding: 28px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); }
+.event-vault-card { display: grid; grid-template-columns: minmax(0,.92fr) minmax(400px,1.08fr); gap: 32px; margin: 32px 0 28px; padding: 32px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); }
 .event-vault-card.is-pending { grid-template-columns: minmax(0,1fr) auto; }
 .event-vault-intro { display: flex; align-items: flex-start; gap: 16px; }
 .event-vault-icon { flex: 0 0 auto; display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; background: var(--mint); color: var(--success); }
@@ -484,20 +486,23 @@
 .event-vault-status svg { width: 13px; }
 .event-vault-card h2 { margin: 7px 0 7px; font-size: 20px; line-height: 1.25; }
 .event-vault-card p { max-width: 560px; margin: 0; color: var(--muted); }
-.event-vault-details { min-width: 0; display: grid; gap: 14px; }
-.event-vault-details dl { margin: 0; display: flex; gap: 32px; }
+.event-vault-details { min-width: 0; padding-left: 32px; border-left: 1px solid var(--line); display: grid; align-content: center; gap: 14px; }
+.event-vault-details dl { margin: 0; display: flex; gap: 48px; }
 .event-vault-details dl div { display: grid; gap: 3px; }
 .event-vault-details dt, .event-vault-address > span { color: var(--muted); font-size: 11px; }
-.event-vault-details dd { margin: 0; font-size: 13px; font-weight: 600; }
-.event-vault-address { min-width: 0; padding: 14px 14px 14px 16px; border: 1px solid var(--line); border-radius: 16px; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 5px 16px; background: var(--canvas); }
+.event-vault-details dd { margin: 0; font-size: 14px; font-weight: 600; }
+.event-vault-address { min-width: 0; padding: 14px 14px 14px 16px; border: 1px solid var(--line); border-radius: 16px; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 6px 16px; background: var(--canvas); }
+.event-vault-address.has-error { border-color: #e8b8b0; }
 .event-vault-address > span { grid-column: 1 / -1; }
-.event-vault-address code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.event-vault-address code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; user-select: all; }
 .event-vault-address .app-secondary-button { min-height: 40px; padding: 8px 14px; }
+.event-vault-copy-status { min-height: 18px; color: var(--muted); font-size: 11px; }
+.event-vault-copy-status.is-error { color: var(--error); }
 .event-vault-setup { align-self: center; display: flex; align-items: center; gap: 18px; }
 .event-vault-setup p { max-width: 420px; font-size: 13px; }
 .event-vault-error { grid-column: 1 / -1; }
-@media (max-width: 940px) { .event-vault-card, .event-vault-card.is-pending { grid-template-columns: 1fr; } .event-vault-details { padding-left: 64px; } }
-@media (max-width: 620px) { .event-vault-card { padding: 20px; gap: 22px; } .event-vault-details { padding-left: 0; } .event-vault-details dl { gap: 24px; } .event-vault-address { grid-template-columns: 1fr; } .event-vault-address > * { grid-column: 1; } .event-vault-address code { white-space: normal; overflow-wrap: anywhere; } .event-vault-address .app-secondary-button, .event-vault-setup .app-secondary-button { width: 100%; } .event-vault-setup { align-items: stretch; flex-direction: column; } }
+@media (max-width: 940px) { .event-vault-card, .event-vault-card.is-pending { grid-template-columns: 1fr; } .event-vault-details { padding: 24px 0 0 64px; border-top: 1px solid var(--line); border-left: 0; } }
+@media (max-width: 620px) { .event-vault-card { margin-top: 24px; padding: 20px; gap: 22px; } .event-vault-details { padding: 22px 0 0; } .event-vault-details dl { gap: 32px; } .event-vault-address { grid-template-columns: 1fr; } .event-vault-address > * { grid-column: 1; } .event-vault-address code { white-space: normal; overflow-wrap: anywhere; } .event-vault-address .app-secondary-button, .event-vault-setup .app-secondary-button { width: 100%; } .event-vault-setup { align-items: stretch; flex-direction: column; } }
 .aurora-route-card { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
 .aurora-route-heading { display: flex; align-items: flex-start; gap: 12px; }
 .aurora-route-heading > svg { width: 20px; margin-top: 2px; color: var(--accent); }
@@ -511,6 +516,9 @@
 .aurora-route-status > span { padding: 7px 11px; border-radius: 999px; background: var(--canvas); font-size: 12px; text-transform: capitalize; }
 .aurora-route-status > span[data-status="success"] { color: var(--success); background: var(--mint); }
 .aurora-unavailable { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--canvas); text-align: left; }
+.sponsor-payment-pending { display: flex; align-items: flex-start; gap: 12px; padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--butter); text-align: left; }
+.sponsor-payment-pending > svg { flex: 0 0 auto; width: 20px; margin-top: 2px; }
+.sponsor-payment-pending p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .direct-funding-details { border-top: 1px solid var(--line); padding-top: 14px; }
 .direct-funding-details summary { min-height: 40px; cursor: pointer; font-weight: 600; text-align: left; }
 .direct-funding-details > div { display: grid; gap: 10px; padding-top: 10px; }

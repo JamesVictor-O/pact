@@ -32,7 +32,7 @@ contract PactEventVaultTest is Test {
     function setUp() public {
         registry = new PactAgreementRegistry();
         token = new VaultTestToken();
-        factory = new PactEventVaultFactory(address(registry), address(token));
+        factory = new PactEventVaultFactory(address(registry), address(token), relayer);
         organizer = vm.addr(organizerKey);
         payee = vm.addr(payeeKey);
         uint64 deadline = uint64(block.timestamp + 1 days);
@@ -109,6 +109,41 @@ contract PactEventVaultTest is Test {
         assertEq(vault.paymentRouting(paymentId), 600e6);
         assertEq(vault.paymentPaid(paymentId), 0);
         assertEq(vault.routeAmount(routeId), 600e6);
+        assertEq(vault.routeStatus(routeId), 1);
+    }
+
+    function testResolverFinalizesDeliveredRouteExactlyOnce() public {
+        bytes32 routeId = _routePayment(600e6);
+        vm.prank(relayer);
+        vault.resolveRouteDelivered(routeId);
+        assertEq(vault.routeStatus(routeId), 2);
+        assertEq(vault.paymentRouting(paymentId), 0);
+        assertEq(vault.paymentPaid(paymentId), 600e6);
+        assertEq(vault.agreementPaid(agreementId), 600e6);
+        vm.prank(relayer);
+        vm.expectRevert(PactEventVault.InvalidRouteStatus.selector);
+        vault.resolveRouteDelivered(routeId);
+    }
+
+    function testResolverRestoresRefundedRouteOnlyAfterFundsReturn() public {
+        bytes32 routeId = _routePayment(600e6);
+        vm.prank(relayer);
+        vm.expectRevert(PactEventVault.InsufficientAvailable.selector);
+        vault.resolveRouteRefunded(routeId);
+        token.mint(address(vault), 600e6);
+        vm.prank(relayer);
+        vault.resolveRouteRefunded(routeId);
+        assertEq(vault.routeStatus(routeId), 3);
+        assertEq(vault.paymentRouting(paymentId), 0);
+        assertEq(vault.paymentAllocated(paymentId), 1_000e6);
+        assertEq(vault.allocatedTotal(), 1_000e6);
+        assertEq(vault.availableBalance(), 0);
+    }
+
+    function testUnauthorizedAccountCannotResolveRoute() public {
+        bytes32 routeId = _routePayment(600e6);
+        vm.expectRevert(PactEventVault.UnauthorizedResolver.selector);
+        vault.resolveRouteDelivered(routeId);
     }
 
     function testCannotAllocateAnotherEventsAgreement() public {
@@ -155,6 +190,19 @@ contract PactEventVaultTest is Test {
     }
 
     function _registerAgreement() internal { _registerAgreement(agreementId, eventId); }
+
+    function _routePayment(uint256 amount) internal returns (bytes32 routeId) {
+        token.mint(address(vault), 1_000e6);
+        uint64 deadline = uint64(block.timestamp + 1 hours);
+        bytes memory allocation = _sign(organizerKey, vault.allocationDigest(agreementId, paymentId, 1_000e6, 0, deadline));
+        vault.allocate(agreementId, paymentId, 1_000e6, 0, deadline, allocation);
+        routeId = keccak256("resolved-aurora-route");
+        bytes memory route = _sign(
+            organizerKey,
+            vault.routeDigest(agreementId, paymentId, routeId, address(0xA0A0), amount, 1, deadline)
+        );
+        vault.routePayment(agreementId, paymentId, routeId, address(0xA0A0), amount, 1, deadline, route);
+    }
 
     function _registerAgreement(bytes32 id, bytes32 targetEvent) internal {
         PactAgreementRegistry.Proposal memory proposal = PactAgreementRegistry.Proposal(

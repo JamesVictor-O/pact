@@ -43,6 +43,7 @@ contract PactEventVault is EIP712, ReentrancyGuard {
 
     bytes32 public immutable eventId;
     address public immutable organizer;
+    address public immutable routeResolver;
     IERC20 public immutable settlementToken;
     IPactAgreementRegistry public immutable agreementRegistry;
     uint256 public immutable settlementUnit;
@@ -56,6 +57,9 @@ contract PactEventVault is EIP712, ReentrancyGuard {
     mapping(bytes32 => uint256) public paymentRouting;
     mapping(bytes32 => uint256) public agreementRouting;
     mapping(bytes32 => uint256) public routeAmount;
+    mapping(bytes32 => uint8) public routeStatus;
+    mapping(bytes32 => bytes32) public routePaymentId;
+    mapping(bytes32 => bytes32) public routeAgreementId;
     mapping(bytes32 => bytes32) public paymentAgreement;
     mapping(bytes32 => uint256) public refundedByReceipt;
 
@@ -67,18 +71,23 @@ contract PactEventVault is EIP712, ReentrancyGuard {
     error InsufficientAvailable();
     error InsufficientAllocation();
     error AgreementLimitExceeded();
+    error UnauthorizedResolver();
+    error InvalidRouteStatus();
 
     event FundsAllocated(bytes32 indexed agreementId, bytes32 indexed paymentId, uint256 amount);
     event PaymentReleased(bytes32 indexed agreementId, bytes32 indexed paymentId, address indexed payoutAddress, uint256 amount);
     event PaymentRouted(bytes32 indexed agreementId, bytes32 indexed paymentId, bytes32 indexed routeId, address depositAddress, uint256 amount);
+    event PaymentRouteDelivered(bytes32 indexed agreementId, bytes32 indexed paymentId, bytes32 indexed routeId, uint256 amount);
+    event PaymentRouteRefunded(bytes32 indexed agreementId, bytes32 indexed paymentId, bytes32 indexed routeId, uint256 amount);
     event FundingRefunded(bytes32 indexed fundingReceiptId, address indexed recipient, uint256 amount);
 
-    constructor(bytes32 eventId_, address organizer_, address registry_, address token_) EIP712("PactEventVault", "1") {
-        if (eventId_ == bytes32(0) || organizer_ == address(0) || registry_ == address(0) || token_ == address(0)) {
+    constructor(bytes32 eventId_, address organizer_, address registry_, address token_, address routeResolver_) EIP712("PactEventVault", "1") {
+        if (eventId_ == bytes32(0) || organizer_ == address(0) || registry_ == address(0) || token_ == address(0) || routeResolver_ == address(0)) {
             revert InvalidInput();
         }
         eventId = eventId_;
         organizer = organizer_;
+        routeResolver = routeResolver_;
         agreementRegistry = IPactAgreementRegistry(registry_);
         settlementToken = IERC20(token_);
         uint8 decimals = IERC20Metadata(token_).decimals();
@@ -150,8 +159,46 @@ contract PactEventVault is EIP712, ReentrancyGuard {
         paymentRouting[paymentId] += amount;
         agreementRouting[agreementId] += amount;
         routeAmount[routeId] = amount;
+        routeStatus[routeId] = 1;
+        routePaymentId[routeId] = paymentId;
+        routeAgreementId[routeId] = agreementId;
         settlementToken.safeTransfer(depositAddress, amount);
         emit PaymentRouted(agreementId, paymentId, routeId, depositAddress, amount);
+    }
+
+    /// @notice Finalizes accounting after the resolver has verified destination-chain delivery.
+    /// @dev The resolver cannot move funds or change any route field; it can only close the exact route
+    ///      previously authorized by the organizer.
+    function resolveRouteDelivered(bytes32 routeId) external {
+        if (msg.sender != routeResolver) revert UnauthorizedResolver();
+        if (routeStatus[routeId] != 1) revert InvalidRouteStatus();
+        bytes32 paymentId = routePaymentId[routeId];
+        bytes32 agreementId = routeAgreementId[routeId];
+        uint256 amount = routeAmount[routeId];
+        routeStatus[routeId] = 2;
+        paymentRouting[paymentId] -= amount;
+        agreementRouting[agreementId] -= amount;
+        paymentPaid[paymentId] += amount;
+        agreementPaid[agreementId] += amount;
+        emit PaymentRouteDelivered(agreementId, paymentId, routeId, amount);
+    }
+
+    /// @notice Restores a failed route to its original allocation after funds have returned to the vault.
+    /// @dev Solvency is checked before accounting is restored. The resolver cannot redirect the refund.
+    function resolveRouteRefunded(bytes32 routeId) external {
+        if (msg.sender != routeResolver) revert UnauthorizedResolver();
+        if (routeStatus[routeId] != 1) revert InvalidRouteStatus();
+        bytes32 paymentId = routePaymentId[routeId];
+        bytes32 agreementId = routeAgreementId[routeId];
+        uint256 amount = routeAmount[routeId];
+        if (availableBalance() < amount) revert InsufficientAvailable();
+        routeStatus[routeId] = 3;
+        paymentRouting[paymentId] -= amount;
+        agreementRouting[agreementId] -= amount;
+        paymentAllocated[paymentId] += amount;
+        agreementAllocated[agreementId] += amount;
+        allocatedTotal += amount;
+        emit PaymentRouteRefunded(agreementId, paymentId, routeId, amount);
     }
 
     function release(

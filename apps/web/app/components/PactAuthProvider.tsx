@@ -1,11 +1,11 @@
 "use client";
 
 import {
-  DynamicContextProvider,
   useConnectWithOtp,
   useDynamicContext,
   type UserProfile,
 } from "@dynamic-labs/sdk-react-core";
+import dynamic from "next/dynamic";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { authClient, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
 import type { PactUser } from "../../lib/pact-types";
@@ -29,6 +29,11 @@ const PactAuthContext = createContext<PactAuthContextValue>({
   verifyEmailCode: async () => undefined,
   signOut: () => authClient.signOut(),
 });
+
+const DynamicContextProvider = dynamic(
+  () => import("@dynamic-labs/sdk-react-core").then((module) => module.DynamicContextProvider),
+  { ssr: false },
+);
 
 function toPactUser(user: UserProfile): PactUser {
   const email = user.email?.trim().toLowerCase() ?? "";

@@ -16,7 +16,7 @@ export default function FundingPage() {
   const searchParams = useSearchParams();
   const [sources, setSources] = useState<FundingSource[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [copied,setCopied]=useState(false);
+  const [copyStatus,setCopyStatus]=useState<"idle"|"copied"|"error">("idle");
   const [vaultAction,setVaultAction]=useState<"idle"|"working"|"error">("idle");
   const {user}=usePactAuth();
 
@@ -38,6 +38,12 @@ export default function FundingPage() {
   ];
   const networkLabel=Number(process.env.NEXT_PUBLIC_MONAD_CHAIN_ID??10143)===10143?"Monad Testnet":"Monad";
   async function setupVault(){if(!user)return;setVaultAction("working");try{await pactAccountAdapter.ensureAccount(user);const deadline=new Date(Date.now()+7*24*60*60*1000).toISOString();const signed=await pactAccountAdapter.signEventVault(user.email,event.id,deadline);await financialApi.retryEventVault(event.id,{eventId:event.id,organizer:signed.address,deadline,signature:signed.signature});window.location.reload();}catch{setVaultAction("error");}}
+  async function copyVaultAddress(){
+    if(!event.vaultAddress)return;
+    try{await navigator.clipboard.writeText(event.vaultAddress);setCopyStatus("copied");}
+    catch{setCopyStatus("error");}
+    window.setTimeout(()=>setCopyStatus("idle"),1800);
+  }
 
   return <div className="funding-page">
     {(searchParams.get("added") === "1" || searchParams.get("updated") === "1") && <div className="app-banner app-banner-success" role="status"><Check aria-hidden="true" /><span><strong>Funding source {searchParams.get("updated") === "1" ? "updated" : "added"}.</strong> Your funding position now reflects the latest amounts.</span></div>}
@@ -45,7 +51,7 @@ export default function FundingPage() {
 
     <section className={`event-vault-card ${event.vaultStatus!=="ready"?"is-pending":""}`} aria-labelledby="event-vault-heading">
       <div className="event-vault-intro"><span className="event-vault-icon"><ShieldCheck aria-hidden="true" /></span><div><div className="event-vault-kicker"><p className="app-eyebrow">Event collection account</p>{event.vaultStatus==="ready"&&<span className="event-vault-status"><CheckCircle2 aria-hidden="true"/> Ready</span>}</div><h2 id="event-vault-heading">{event.vaultStatus==="ready"?"Receive event funding in USDC":event.vaultStatus==="not_started"?"Set up this event’s USDC account":"Finalizing the event account"}</h2><p>{event.vaultStatus==="ready"?"Every sponsor route settles into this one event-owned account.":"Funding requests stay disabled until the dedicated onchain account is confirmed."}</p></div></div>
-      {event.vaultAddress?<div className="event-vault-details"><dl><div><dt>Network</dt><dd>{networkLabel}</dd></div><div><dt>Asset</dt><dd>USDC</dd></div></dl><div className="event-vault-address"><span>Receiving address</span><code>{event.vaultAddress}</code><button className="app-secondary-button" type="button" onClick={async()=>{await navigator.clipboard.writeText(event.vaultAddress!);setCopied(true);window.setTimeout(()=>setCopied(false),1500)}} aria-live="polite"><Copy aria-hidden="true"/>{copied?"Address copied":"Copy address"}</button></div></div>:<div className="event-vault-setup"><p>{event.vaultStatus==="not_started"?"Create a permanent account for this event before sending funding links.":"The signed setup is safe. Try finalizing again if this state does not clear."}</p><button className="app-secondary-button" type="button" disabled={vaultAction==="working"} aria-busy={vaultAction==="working"} onClick={()=>void setupVault()}>{vaultAction==="working"?"Finalizing…":event.vaultStatus==="not_started"?"Set up account":"Try again"}</button></div>}
+      {event.vaultAddress?<div className="event-vault-details"><dl><div><dt>Network</dt><dd>{networkLabel}</dd></div><div><dt>Settlement asset</dt><dd>USDC</dd></div></dl><div className={`event-vault-address${copyStatus==="error"?" has-error":""}`}><span>Event receiving address</span><code title={event.vaultAddress}>{event.vaultAddress}</code><button className="app-secondary-button" type="button" onClick={()=>void copyVaultAddress()} aria-label={copyStatus==="copied"?"Event receiving address copied":"Copy event receiving address"}>{copyStatus==="copied"?<CheckCircle2 aria-hidden="true"/>:<Copy aria-hidden="true"/>}{copyStatus==="copied"?"Copied":"Copy address"}</button></div><p className={`event-vault-copy-status${copyStatus==="error"?" is-error":""}`} aria-live="polite">{copyStatus==="error"?"Couldn’t copy automatically. Select the address and copy it manually.":copyStatus==="copied"?"Address copied to your clipboard.":"Share this address only for USDC transfers on the network shown above."}</p></div>:<div className="event-vault-setup"><p>{event.vaultStatus==="not_started"?"Create a permanent account for this event before sending funding links.":"The signed setup is safe. Try finalizing again if this state does not clear."}</p><button className="app-secondary-button" type="button" disabled={vaultAction==="working"} aria-busy={vaultAction==="working"} onClick={()=>void setupVault()}>{vaultAction==="working"?"Finalizing…":event.vaultStatus==="not_started"?"Set up account":"Try again"}</button></div>}
       {vaultAction==="error"&&<p className="event-vault-error field-error" role="alert">Pact couldn’t finalize the event account. Your event is safe—try again.</p>}
     </section>
 

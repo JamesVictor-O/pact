@@ -37,7 +37,7 @@ export default function EventShell({ eventId, children }: { eventId: string; chi
   useEffect(() => {
     if (!authReady) return;
     if (!authenticatedUser) {
-      router.replace("/auth");
+      router.replace("/auth?intent=organizer");
       return;
     }
     let live=true;setUser(authenticatedUser);migrateLegacyFinancialData().then(()=>financialApi.getEvent(eventId)).then(storedEvent=>{if(!live)return;setEvent(storedEvent);setStatus("ready");}).catch(()=>live&&setStatus("missing"));return()=>{live=false};
@@ -45,7 +45,7 @@ export default function EventShell({ eventId, children }: { eventId: string; chi
 
   async function signOut() {
     await endSession();
-    router.replace("/auth");
+    router.replace("/auth?intent=organizer");
   }
 
   if (status === "loading") return <main className="shell-loading" aria-label="Loading event workspace"><span /><span /><span /></main>;

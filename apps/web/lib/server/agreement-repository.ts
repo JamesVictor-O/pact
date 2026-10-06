@@ -4,7 +4,7 @@ import { database, oneOrNull, transaction } from "./database";
 import type { Invoice, PaymentAgreement, PayoutPreference, PayoutProfile } from "../pact-types";
 
 type AgreementRow = QueryResultRow & {
-  id: string; event_id: string; expense_id: string; organizer_user_id: string; payee_id: string; payee_email: string; payee_user_id: string | null;
+  id: string; event_id: string; network_chain_id:string; expense_id: string; organizer_user_id: string; payee_id: string; payee_email: string; payee_user_id: string | null;
   total_amount_minor: string; currency: string; status: PaymentAgreement["status"]; snapshot: PaymentAgreement["snapshot"];
   agreement_hash: Buffer; schedule_hash: Buffer; organizer_address: string | null; payee_address: string | null;
   organizer_signature: Buffer | null; payee_signature: Buffer | null; registration_status: PaymentAgreement["registrationStatus"];
@@ -25,9 +25,10 @@ export function mapInvoice(row: InvoiceRow): Invoice { return {id:row.id,eventId
 export function mapPayout(row: PayoutRow): PayoutProfile { return {userId:row.user_id,signingAddress:row.signing_address,payoutType:row.payout_type,payoutAddress:row.payout_address,verificationStatus:row.verification_status,verifiedAt:iso(row.verified_at),destinationChain:row.destination_chain,destinationAssetId:row.destination_asset_id,destinationAssetSymbol:row.destination_asset_symbol,destinationAssetDecimals:row.destination_asset_decimals,destinationAddress:row.destination_address,destinationVerification:row.destination_verification}; }
 
 const agreementSelect = `select * from payment_agreements`;
-export async function listAccessibleAgreements(userId:string,email:string) { const result=await database().query<AgreementRow>(`${agreementSelect} where organizer_user_id=$1 or payee_email=$2 order by created_at desc`,[userId,email]); return result.rows.map(mapAgreement); }
-export async function findAccessibleAgreement(id:string,userId:string,email:string) { const row=await oneOrNull<AgreementRow>(`${agreementSelect} where id=$1 and (organizer_user_id=$2 or payee_email=$3)`,[id,userId,email]); return row?mapAgreement(row):null; }
-export async function findOrganizerAgreementByExpense(expenseId:string,userId:string) { const row=await oneOrNull<AgreementRow>(`${agreementSelect} where expense_id=$1 and organizer_user_id=$2`,[expenseId,userId]); return row?mapAgreement(row):null; }
+const chainId=()=>Number(process.env.MONAD_CHAIN_ID);
+export async function listAccessibleAgreements(userId:string,email:string) { const result=await database().query<AgreementRow>(`${agreementSelect} where network_chain_id=$3 and (organizer_user_id=$1 or payee_email=$2) order by created_at desc`,[userId,email,chainId()]); return result.rows.map(mapAgreement); }
+export async function findAccessibleAgreement(id:string,userId:string,email:string) { const row=await oneOrNull<AgreementRow>(`${agreementSelect} where id=$1 and network_chain_id=$4 and (organizer_user_id=$2 or payee_email=$3)`,[id,userId,email,chainId()]); return row?mapAgreement(row):null; }
+export async function findOrganizerAgreementByExpense(expenseId:string,userId:string) { const row=await oneOrNull<AgreementRow>(`${agreementSelect} where expense_id=$1 and organizer_user_id=$2 and network_chain_id=$3`,[expenseId,userId,chainId()]); return row?mapAgreement(row):null; }
 export async function invoiceForAgreement(id:string) { const row=await oneOrNull<InvoiceRow>(`select * from invoices where agreement_id=$1`,[id]); return row?mapInvoice(row):null; }
 export async function accessibleInvoice(id:string,userId:string,email:string) { const row=await oneOrNull<InvoiceRow>(`select i.* from invoices i left join payment_agreements a on a.id=i.agreement_id where i.id=$1 and (a.organizer_user_id=$2 or a.payee_email=$3)`,[id,userId,email]); return row?mapInvoice(row):null; }
 export async function payoutForAgreement(id:string) { const row=await oneOrNull<PayoutRow>(`select p.* from payout_profiles p join payment_agreements a on a.payee_user_id=p.user_id where a.id=$1`,[id]); return row?mapPayout(row):null; }
@@ -39,7 +40,7 @@ export async function createAgreementBundle(input:CreateAgreementBundle,userId:s
     if(a.organizerUserId!==userId) throw new Error("Organizer identity mismatch");
     await client.query(`insert into payees(id,event_id,name,normalized_email,created_at,updated_at) values($1,$2,$3,$4,now(),now()) on conflict(event_id,normalized_email) do update set name=excluded.name,updated_at=now()`,[a.payeeId,a.eventId,input.payeeName,a.payeeEmail]);
     const payee=await client.query<{id:string}>(`select id from payees where event_id=$1 and normalized_email=$2`,[a.eventId,a.payeeEmail]);
-    await client.query(`insert into payment_agreements(id,event_id,expense_id,organizer_user_id,payee_id,payee_email,total_amount_minor,currency,status,snapshot,agreement_hash,schedule_hash,registration_status,created_at,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$10,$11,'not_started',now(),now()) on conflict(expense_id) do nothing`,[a.id,a.eventId,a.expenseId,userId,payee.rows[0]!.id,a.payeeEmail,a.totalAmountMinor,a.currency,JSON.stringify(a.snapshot),bytes(a.agreementHash),bytes(a.scheduleHash)]);
+    await client.query(`insert into payment_agreements(id,event_id,network_chain_id,expense_id,organizer_user_id,payee_id,payee_email,total_amount_minor,currency,status,snapshot,agreement_hash,schedule_hash,registration_status,created_at,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',$10,$11,$12,'not_started',now(),now()) on conflict(expense_id) do nothing`,[a.id,a.eventId,chainId(),a.expenseId,userId,payee.rows[0]!.id,a.payeeEmail,a.totalAmountMinor,a.currency,JSON.stringify(a.snapshot),bytes(a.agreementHash),bytes(a.scheduleHash)]);
     await client.query(`insert into invoices(id,event_id,direction,agreement_id,invoice_number,snapshot,amount_minor,currency,status,document_hash,created_at,updated_at) values($1,$2,'payable',$3,$4,$5,$6,$7,'prepared',$8,now(),now()) on conflict(invoice_number) do nothing`,[i.id,i.eventId,a.id,i.invoiceNumber,JSON.stringify(i.snapshot),i.amountMinor,i.currency,bytes(i.documentHash)]);
     const row=await client.query<AgreementRow>(`${agreementSelect} where expense_id=$1`,[a.expenseId]);
     return mapAgreement(row.rows[0]!);

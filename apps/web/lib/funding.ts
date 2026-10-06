@@ -57,11 +57,20 @@ export function getFundingSummary(
 }
 
 export function formatEventCurrency(value: number, currency: string): string {
-  return new Intl.NumberFormat("en", {
+  if (!Number.isFinite(value)) return "--";
+  if (Object.is(value, -0)) value = 0;
+  const formatter = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-    maximumFractionDigits: 0,
-  }).format(value);
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (value !== 0 && Math.abs(value) < 0.01) return `${value < 0 ? "-" : ""}<${formatter.format(0.01)}`;
+  return formatter.format(value);
+}
+
+export function formatMinorCurrency(valueMinor: number, currency: string): string {
+  return formatEventCurrency(valueMinor / 100, currency);
 }
 
 export function formatFundingDate(date?: string, long = false): string {

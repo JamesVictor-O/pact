@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getFundingSourceStatus, getFundingSummary } from "./funding.ts";
+import { formatEventCurrency, formatMinorCurrency, getFundingSourceStatus, getFundingSummary } from "./funding.ts";
 import type { FundingSource } from "./pact-types.ts";
 
 function source(overrides: Partial<FundingSource> = {}): FundingSource {
@@ -54,4 +54,14 @@ test("cancelled commitments stop being expected without erasing received cash", 
   assert.equal(summary.received, 3_000);
   assert.equal(summary.stillExpected, 0);
   assert.equal(summary.available, 3_000);
+});
+
+test("currency formatting preserves cents across major and minor units", () => {
+  assert.equal(formatEventCurrency(0.03, "USD"), "$0.03");
+  assert.equal(formatEventCurrency(0, "USD"), "$0.00");
+  assert.equal(formatEventCurrency(-0, "USD"), "$0.00");
+  assert.equal(formatEventCurrency(0.004, "USD"), "<$0.01");
+  assert.equal(formatEventCurrency(1_000, "USD"), "$1,000.00");
+  assert.equal(formatMinorCurrency(3, "USD"), "$0.03");
+  assert.equal(formatMinorCurrency(100_050, "USD"), "$1,000.50");
 });

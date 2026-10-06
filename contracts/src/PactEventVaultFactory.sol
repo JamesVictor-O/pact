@@ -14,6 +14,7 @@ contract PactEventVaultFactory is EIP712 {
 
     address public immutable agreementRegistry;
     address public immutable settlementToken;
+    address public immutable routeResolver;
     mapping(bytes32 => address) public eventVaults;
 
     error InvalidInput();
@@ -23,10 +24,11 @@ contract PactEventVaultFactory is EIP712 {
 
     event EventVaultCreated(bytes32 indexed eventId, address indexed organizer, address indexed vault);
 
-    constructor(address registry_, address token_) EIP712("PactEventVaultFactory", "1") {
-        if (registry_ == address(0) || token_ == address(0)) revert InvalidInput();
+    constructor(address registry_, address token_, address routeResolver_) EIP712("PactEventVaultFactory", "1") {
+        if (registry_ == address(0) || token_ == address(0) || routeResolver_ == address(0)) revert InvalidInput();
         agreementRegistry = registry_;
         settlementToken = token_;
+        routeResolver = routeResolver_;
     }
 
     function createEventVault(bytes32 eventId, address organizer, uint64 deadline, bytes calldata organizerSignature)
@@ -37,7 +39,7 @@ contract PactEventVaultFactory is EIP712 {
         if (eventVaults[eventId] != address(0)) revert EventVaultAlreadyExists();
         bytes32 digest = authorizationDigest(eventId, organizer, deadline);
         if (ECDSA.recover(digest, organizerSignature) != organizer) revert InvalidSignature();
-        vault = address(new PactEventVault{salt: eventId}(eventId, organizer, agreementRegistry, settlementToken));
+        vault = address(new PactEventVault{salt: eventId}(eventId, organizer, agreementRegistry, settlementToken, routeResolver));
         eventVaults[eventId] = vault;
         emit EventVaultCreated(eventId, organizer, vault);
     }
@@ -50,7 +52,7 @@ contract PactEventVaultFactory is EIP712 {
         bytes32 bytecodeHash = keccak256(
             abi.encodePacked(
                 type(PactEventVault).creationCode,
-                abi.encode(eventId, organizer, agreementRegistry, settlementToken)
+                abi.encode(eventId, organizer, agreementRegistry, settlementToken, routeResolver)
             )
         );
         return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), eventId, bytecodeHash)))));

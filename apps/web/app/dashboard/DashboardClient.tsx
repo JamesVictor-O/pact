@@ -26,7 +26,7 @@ export default function DashboardClient() {
   useEffect(() => {
     if (!authReady) return;
     if (!authenticatedUser) {
-      router.replace("/auth");
+      router.replace("/auth?intent=organizer");
       return;
     }
     let live=true;migrateLegacyFinancialData().then(()=>Promise.all([financialApi.listEvents(),listAgreements().catch(()=>[])])).then(([ownerEvents,agreements])=>{if(!live)return;if(ownerEvents.length===0){router.replace("/events/new");return;}setUser(authenticatedUser);setEvents(ownerEvents);setPendingAgreements(agreements.filter(item=>item.status==="awaiting_acceptance").length);setLoading(false);}).catch(()=>{if(live)setLoading(false);});return()=>{live=false};
