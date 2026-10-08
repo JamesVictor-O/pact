@@ -1,8 +1,9 @@
 import "server-only";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { NextRequest } from "next/server";
+import { resolveCanonicalUserId } from "./user-identity-repository";
 
-export type VerifiedIdentity = { userId: string; email: string; name: string; token: JWTPayload };
+export type VerifiedIdentity = { userId: string; providerUserId: string; email: string; name: string; token: JWTPayload };
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 
@@ -20,8 +21,11 @@ export async function requireIdentity(request: NextRequest): Promise<VerifiedIde
     const scopes = Array.isArray(payload.scopes) ? payload.scopes : typeof payload.scope === "string" ? payload.scope.split(" ") : [];
     if (scopes.includes("requiresAdditionalAuth")) throw new AuthError(403, "Additional authentication is required");
     if (!payload.sub || typeof payload.email !== "string" || !payload.email.trim()) throw new AuthError(403, "A verified email is required");
-    const name = [payload.given_name, payload.family_name].filter((value) => typeof value === "string").join(" ") || String(payload.alias ?? payload.email.split("@")[0]);
-    return { userId: payload.sub, email: payload.email.trim().toLowerCase(), name, token: payload };
+    const providerUserId = payload.sub;
+    const email = payload.email.trim().toLowerCase();
+    const name = [payload.given_name, payload.family_name].filter((value) => typeof value === "string").join(" ") || String(payload.alias ?? email.split("@")[0]);
+    const userId = await resolveCanonicalUserId(providerUserId, email, name);
+    return { userId, providerUserId, email, name, token: payload };
   } catch (error) {
     if (error instanceof AuthError) throw error;
     throw new AuthError(401, "Invalid or expired authentication token");

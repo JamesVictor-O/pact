@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, LoaderCircle, LockKeyhole, Plus, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EXPENSE_CATEGORY_LABELS } from "../../../../lib/expenses";
 import { getPayeeEmail, getPayeeName } from "../../../../lib/agreements";
-import { createAgreementForExpense, submitProposal } from "../../../../lib/agreement-api";
+import { createAgreementForExpense, getAgreementByExpense, submitProposal } from "../../../../lib/agreement-api";
 import { pactAccountAdapter } from "../../../../lib/pact-account-adapter";
 import { financialApi } from "../../../../lib/financial-api";
 import { formatEventCurrency } from "../../../../lib/funding";
@@ -65,10 +65,10 @@ export default function ExpenseForm({ expenseId }: { expenseId?: string }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [values, setValues] = useState<FormValues>(emptyValues);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [status, setStatus] = useState<"loading" | "idle" | "submitting" | "missing">(expenseId ? "loading" : "idle");
+  const [status, setStatus] = useState<"loading" | "idle" | "submitting" | "missing" | "locked">(expenseId ? "loading" : "idle");
   const [submitError, setSubmitError] = useState("");
 
-  useEffect(() => { if (!expenseId) return;let live=true;financialApi.getExpense(expenseId).then(record=>{if(!live)return;if(record.expense.eventId!==event.id){setStatus("missing");return;}setValues(fromRecord(record));setStatus("idle");}).catch(()=>live&&setStatus("missing"));return()=>{live=false}; }, [event.id, expenseId]);
+  useEffect(() => { if (!expenseId) return;let live=true;financialApi.getExpense(expenseId).then(async record=>{if(!live)return;if(record.expense.eventId!==event.id){setStatus("missing");return;}setValues(fromRecord(record));try{const bundle=await getAgreementByExpense(expenseId);if(!live)return;const accepted=Boolean(bundle.agreement.acceptedAt)||["acceptance_signed","registration_pending","active","completed"].includes(bundle.agreement.status);setStatus(accepted?"locked":"idle");}catch(error){if(!live)return;setStatus(error instanceof Error&&error.message==="Agreement not found"?"idle":"missing");}}).catch(()=>live&&setStatus("missing"));return()=>{live=false}; }, [event.id, expenseId]);
 
   function setField(field: keyof Omit<FormValues, "payments" | "scheduleType">, value: string) { setValues((current) => ({ ...current, [field]: value })); setErrors((current) => ({ ...current, [field]: undefined, ...(field === "totalAmount" ? { schedule: undefined } : {}) })); }
   function changeTotal(value: string) { setValues((current) => { const oldTotal = parseAmount(current.totalAmount); const nextTotal = parseAmount(value); const payments = current.payments.map((payment) => ({ ...payment })); if (current.scheduleType === "single" && payments[0] && (!payments[0].amount || parseAmount(payments[0].amount) === oldTotal)) payments[0].amount = Number.isFinite(nextTotal) ? amountString(nextTotal) : ""; if (current.scheduleType === "deposit" && payments[1]) { const deposit = parseAmount(payments[0]?.amount ?? ""); payments[1].amount = Number.isFinite(nextTotal) && Number.isFinite(deposit) ? amountString(Math.max(nextTotal - deposit, 0)) : ""; } return { ...current, totalAmount: value, payments }; }); setErrors((current) => ({ ...current, totalAmount: undefined, schedule: undefined })); }
@@ -95,10 +95,11 @@ export default function ExpenseForm({ expenseId }: { expenseId?: string }) {
         await submitProposal(agreement.id,{...signed,expiresAt});
       }
       router.replace(`/events/${event.id}/expenses/${saved.expense.id}?${expenseId ? "updated" : "created"}=1`);
-    } catch { setStatus("idle"); setSubmitError("We couldn’t save this expense. Your details are still here—please try again."); }
+    } catch (error) { setStatus("idle"); setSubmitError(error instanceof Error ? error.message : "We couldn’t save this expense. Your details are still here—please try again."); }
   }
 
   if (status === "loading") return <div className="funding-form-skeleton" aria-label="Loading expense" />;
+  if (status === "locked") return <section className="expense-edit-locked"><span><LockKeyhole aria-hidden="true" /></span><p className="app-eyebrow">Accepted agreement</p><h1>This expense is locked.</h1><p>The payee has accepted the amount and payment schedule. Pact keeps those signed terms unchanged.</p><Link className="app-secondary-button" href={`/events/${event.id}/expenses/${expenseId}`}>Back to expense</Link></section>;
   if (status === "missing") return <section className="funding-error"><h1>Expense not found</h1><p>It may have been removed or belong to another event.</p><Link className="app-secondary-button" href={`/events/${event.id}/expenses`}>Back to expenses</Link></section>;
   const scheduleTotal = values.payments.reduce((sum, payment) => sum + (Number.isFinite(parseAmount(payment.amount)) ? parseAmount(payment.amount) : 0), 0);
 

@@ -2,7 +2,7 @@
 
 This document records Pact's Aurora Intents integration from product idea to mainnet implementation. It explains our decisions, mistakes, corrections, security constraints, contract changes, user feedback, and remaining production tests.
 
-> **Current status, October 2, 2026:** Aurora authenticated successfully, returned 202 supported assets, and identified canonical USDC on Monad. Inbound sponsor routing passes Pact's configuration checks. The upgraded route-resolution vault factory is deployed. Small-value mainnet ingress, delivery, and refund canaries remain outstanding.
+> **Current status, October 8, 2026:** Inbound Aurora routing is live on Monad mainnet. Pact has created and used a persistent Arbitrum/EVM deposit address, observed the source deposit, verified the destination USDC transfer into the correct event vault, and credited the funding request without double counting. The canary also exposed a sub-cent accounting bug, which is now fixed by retaining exact USDC atomic units while crediting only safe whole cents. Outbound cross-chain payouts are implemented but remain disabled until live delivery and refund canaries pass.
 
 ## 1. What judges should understand
 
@@ -170,33 +170,119 @@ Keep the API key in `apps/web/.env.local`. Never add it to `.env.example`. Inbou
 - [x] Add onchain route resolution for delivered and refunded outbound routes
 - [x] Deploy the route-resolution factory to Monad mainnet
 - [x] Replace infrastructure-first sponsor copy with a network-first payment experience
-- [ ] Run a small-value mainnet ingress canary from one EVM and one non-EVM network
+- [x] Run a small-value mainnet ingress canary from an EVM network
+- [ ] Run a small-value mainnet ingress canary from a non-EVM network
 - [ ] Run outbound delivery and refund canaries from a vault created by the new factory
 - [ ] Enable outbound payouts after both canaries pass
 
 ## 10. Implemented inbound flow
 
+This is the exact path currently implemented in Pact.
+
+```text
+Organizer creates an event
+        ↓
+Pact creates one deterministic PactEventVault for that event on Monad
+        ↓
+Organizer creates a funding source and funding request
+        ↓
+Pact creates a receivable invoice and unguessable sponsor link
+        ↓
+Sponsor chooses the network family they are paying from
+        ↓
+Pact requests an Aurora persistent deposit address
+        ↓
+Sponsor sends a supported asset to that address
+        ↓
+Aurora detects and routes the deposit into USDC on Monad
+        ↓
+USDC is transferred to the event's PactEventVault
+        ↓
+Pact independently verifies the Monad receipt and USDC Transfer log
+        ↓
+Pact stores an idempotent receipt and credits the funding source
+        ↓
+The funding request and receivable invoice advance only after verified value arrives
+```
+
+The persistent address is an entry route, not the escrow. The event vault is the event-level escrow and canonical destination. A funding request receives its own attributable Aurora route, while every successful request for the same event settles into the same vault.
+
+### Event vault creation
+
+1. Creating an event initiates vault setup through `PactEventVaultFactory`.
+2. The organizer signs an EIP-712 `EventVaultAuthorization` containing the canonical event ID, organizer address, and deadline.
+3. A relayer submits `createEventVault`; it cannot alter the signed fields or gain authority over the vault.
+4. The factory uses `CREATE2` with the event ID as salt, producing one deterministic `PactEventVault` for that event.
+5. The vault permanently stores the event ID, organizer, agreement registry, canonical USDC token, and route resolver.
+6. The event record stores the vault address, factory address, transaction hash, and readiness state.
+
+The vault accepts ordinary USDC transfers. No sponsor wallet connection to Pact is required, and the factory or relayer cannot withdraw event funds without an organizer-signed instruction.
+
 ### Route creation
 
-1. The sponsor opens the unguessable funding-request link.
-2. The browser loads `GET /api/fund/{slug}/routes`.
-3. Pact returns existing routes plus availability. The API key is never returned.
-4. The sponsor chooses a source-chain family.
-5. `POST /api/fund/{slug}/routes` validates the source chain, funding request, event vault, destination chain, and settlement token.
-6. The server calls Aurora using `sender = fundingRequest.id` and `recipient = event.vaultAddress`.
-7. Pact stores the address before returning it. A unique `(funding_request_id, deposit_chain)` constraint makes retries idempotent.
+1. The organizer creates a funding source, then creates a funding request for an amount under that source.
+2. Pact stores the request, creates its receivable invoice, and generates an unguessable public slug.
+3. The sponsor opens `/fund/{slug}`. This link grants access only to that funding request; it does not expose the organizer's authenticated workspace.
+4. The browser loads `GET /api/fund/{slug}/routes` to obtain existing routes and server-computed availability. The Aurora API key is never returned.
+5. The sponsor chooses a source-chain family: `evm`, `btc`, `sol`, `tron`, `near`, or `stellar`.
+6. The browser calls `POST /api/fund/{slug}/routes` with only the chosen `depositChain`.
+7. `createAuroraRoute` reloads the funding request and event from PostgreSQL. It does not trust a vault, recipient, destination chain, asset, or sender reference supplied by the browser.
+8. Pact requires the event vault to be `ready`, the configured Aurora chain ID to equal the vault chain ID, and the configured destination token to equal Pact's settlement token.
+9. The server calls `POST /api/persistent-deposit-address/{apiKey}` with:
+   - `recipient = event.vaultAddress`
+   - `sender = fundingRequest.id`
+   - `depositChain = sponsor selection`
+   - `destinationChain = monad`
+   - `destinationAsset = canonical Monad USDC Aurora asset ID`
+   - `confidential = false`
+10. Pact writes the returned address, optional memo, Aurora correlation ID, destination, recipient, and sender reference to `aurora_deposit_routes` before showing the address.
+11. The unique `(funding_request_id, deposit_chain)` constraint makes route creation idempotent. If two requests race, Pact returns the already-persisted route.
+
+For `evm`, Aurora returns one address usable across its supported EVM source networks. Non-EVM families receive their own route, and Stellar may require the returned memo.
 
 ### Deposit synchronization
 
-1. The sponsor selects **Check deposit**.
-2. Pact applies a ten-second route cooldown.
-3. The server fetches Aurora `received`, `success`, and `failed` observations.
-4. Every observation is retained in `aurora_route_deposits` with its raw response for support and audit.
-5. For each successful route, Pact reads the destination transaction from its configured RPC.
-6. Pact requires a successful receipt and a transfer from the configured USDC contract to the exact event vault.
-7. The verified log is inserted into `funding_receipts`; its chain/transaction/log uniqueness prevents double credit.
-8. Only a newly inserted receipt increments `funding_sources.received_amount_minor`.
-9. Pact updates the funding request and receivable invoice after confirmed totals reach the requested amount.
+1. The sponsor selects **Check deposit**, which calls `POST /api/fund/{slug}/routes/{routeId}/sync`.
+2. Pact verifies that the route belongs to the funding request identified by the public slug.
+3. Pact applies a ten-second route cooldown so repeated browser actions cannot poll Aurora too aggressively.
+4. The server requests Aurora observations separately for `received`, `success`, and `failed` states.
+5. Every observation is retained in `aurora_route_deposits`, including source chain, destination chain, asset ID, atomic amount, addresses, timestamp, transaction hash, and raw Aurora payload. These records provide support and audit evidence but do not by themselves credit funds.
+6. Pact reconciles each `success` observation against Monad through `AURORA_DESTINATION_RPC_URL`.
+7. The verifier requires a valid destination transaction hash, a successful Monad receipt, the configured USDC contract, and an ERC-20 `Transfer` whose recipient is the exact event vault stored for the route.
+8. Each matching transfer becomes a `funding_receipts` record containing its exact atomic amount, chain ID, transaction hash, log index, block number, contributor, settlement token, and confirmation time.
+9. A unique `(chain_id, transaction_hash, log_index)` constraint makes receipt credit idempotent. Repeated synchronization can update route evidence but cannot credit the same transfer twice.
+10. `recordConfirmedFundingReceipt` locks the funding request row before calculating credit. This serializes concurrent receipts and protects the carried sub-cent remainder.
+11. Only a newly inserted confirmed receipt can increment `funding_sources.received_amount_minor`.
+12. Pact sums confirmed receipt credit for that funding request. Once it reaches the requested amount, the request becomes `received` and its receivable invoice becomes `paid`; otherwise an observed in-flight deposit remains `routing`.
+
+### Amount precision
+
+The event vault and `funding_receipts.amount_atomic` preserve the complete six-decimal USDC value. Pact's current product ledger stores USD amounts in cents, so `funding_receipts.amount_minor` records only the newly creditable whole cents.
+
+Pact calculates that credit cumulatively:
+
+```text
+all confirmed atomic units for the request
+        ↓ convert only complete cents
+safe cumulative cent total
+        ↓ subtract cents credited by earlier receipts
+new cent credit for this receipt
+```
+
+This means a receipt smaller than one cent is still recorded and is not lost. Its atomic units combine with later receipts for the same request until another complete cent can be credited. The ledger never rounds up and therefore never reports more spendable money than the vault received.
+
+### Implemented state transitions
+
+```text
+Aurora route: ready → deposit_received → success
+                                  ↘ failed
+
+Funding request: sent → routing → received
+
+Receipt: confirmed once Monad USDC delivery is independently verified
+```
+
+Aurora `success` is necessary evidence, but it is not sufficient financial finality. Pact credits money only after its own destination-chain verification succeeds.
 
 ### Sponsor experience and advanced fallback
 
@@ -259,6 +345,23 @@ Implementation rules:
 10. `POST /api/deposit/submit/{apiKey}` receives `txHash`, `depositAddress`, and the complete original `quoteResponse`, as required by Aurora's current API
 11. If quote submission fails after the Monad vault transfer confirms, Pact preserves the transaction and payment lock so retries resubmit the same transfer instead of authorizing another one
 
+### Exact outbound implementation status
+
+The outbound path is implemented in the contracts, database, server repositories, and payment APIs, but it is deliberately feature-gated off in production configuration.
+
+1. During agreement acceptance, the payee chooses and verifies a payout destination. Pact stores the destination chain, Aurora asset ID, symbol, decimals, and destination address in the payout profile.
+2. When a scheduled payment is fully allocated, Pact fetches Aurora's supported assets from `GET /api/tokens/{apiKey}` and requests an exact-input quote from `POST /api/quote/{apiKey}`.
+3. The quote fixes the origin asset as Monad USDC, the payee's verified destination, the event vault as `refundTo`, slippage, amount, deposit address, minimum output, and deadline.
+4. Pact stores the full quote in `payout_route_quotes`. The organizer then signs an EIP-712 route authorization containing the agreement ID, payment ID, route ID, Aurora deposit address, exact amount, nonce, and deadline.
+5. The relayer calls `PactEventVault.routePayment`. The vault verifies the active onchain agreement, allocation, organizer signature, nonce, and deadline before sending USDC to Aurora's quoted deposit address.
+6. The vault moves the amount from `allocated` to `routing`; it does not call it paid.
+7. After the Monad transaction confirms, Pact submits its hash, deposit address, and the unchanged complete quote response to `POST /api/deposit/submit/{apiKey}`.
+8. Pact keeps the scheduled payment locked while routing. Submission or reconciliation errors do not authorize a second transfer.
+9. Pact polls Aurora and requires destination transaction evidence before calling the resolver and marking the settlement `delivered`.
+10. If Aurora reports a refund, Pact first requires the returned USDC to be available in the vault, then calls `resolveRouteRefunded` to restore the original allocation.
+
+`AURORA_PAYOUTS_ENABLED=false` is intentional. The implementation must complete live delivery and refund canaries before organizers can use cross-chain payee settlement.
+
 Outbound configuration:
 
 ```dotenv
@@ -298,19 +401,18 @@ The inbound readiness check now passes. `AURORA_PAYOUTS_ENABLED` remains false b
 2. [x] Query `GET /api/tokens/{apiKey}` and configure the exact Monad USDC asset identifier
 3. [x] Confirm the returned token contract equals Pact's canonical Monad USDC address
 4. [x] Enable `AURORA_INTENTS_ENABLED`
-5. Run a small ingress canary from one EVM and one non-EVM network
-6. Confirm destination transfer verification, receipt deduplication, funding totals, and receivable invoice state
-7. [x] Deploy the route-resolution vault factory and test delivery and refund accounting
-8. Run live delivery and refund canaries from a newly created event vault
-9. Enable `AURORA_PAYOUTS_ENABLED` after the canaries pass for each supported destination family
+5. [x] Run a small ingress canary from an EVM network
+6. [x] Confirm destination transfer verification, receipt deduplication, and funding totals for that EVM canary
+7. Run a small ingress canary from a non-EVM network and confirm memo handling where applicable
+8. [x] Deploy the route-resolution vault factory and test delivery and refund accounting
+9. Run live delivery and refund canaries from a newly created event vault
+10. Enable `AURORA_PAYOUTS_ENABLED` after the canaries pass for each supported destination family
 
 ## 15. What remains unproven
 
 The following items require real value on mainnet. Passing unit tests, type checks, and API authentication does not prove them:
 
-- A sponsor deposit from an EVM network settles into the exact Pact event vault
 - A sponsor deposit from a non-EVM network settles with the expected amount and memo handling
-- Destination receipt reconciliation credits the funding source exactly once
 - An outbound route delivers the payee's selected asset and closes onchain routing accounting
 - A refunded outbound route returns sufficient USDC and restores the original payment allocation
 - Rate-limit handling remains usable during repeated status checks
@@ -322,7 +424,7 @@ We will record transaction hashes, observed timings, returned Aurora correlation
 The implementation currently passes:
 
 - 24 Solidity tests, including resolver authorization, terminal-state replay protection, and refund solvency
-- 15 web tests, including Aurora retry and upstream error behavior
+- 19 web tests, including Aurora retry, upstream error behavior, and fractional settlement accounting
 - TypeScript type checking
 - Next.js production build
 - Onchain verification of the new factory's registry, settlement token, and resolver
@@ -331,3 +433,23 @@ Deployment evidence:
 
 - Route-resolution factory transaction: `0x8ebed039d8290308c4568b09f1dcfa0f3c215966c69e568b801106b73e9545be`
 - Route-resolution factory: `0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31`
+
+## 17. First successful inbound mainnet canary, October 7, 2026
+
+The first EVM Persistent Address canary completed from Arbitrum ETH into Monad USDC.
+
+- Persistent deposit address: `0x43e00c8E5604710390a7E8812b27835f745E1747`
+- Source transaction: `0xf96ea9ddfe256bea5804558c13965f5b4ce040299e46fdc45beb0b6611f3489d`
+- Source amount: `0.000014 ETH`
+- Destination event vault: `0xa34C4648428Af097bdFA5d655f104b1742CA5e3A`
+- Monad settlement transaction: `0xb61cf6b91c273113f2370ea418b07f3643ea96c2e2a294dfe011c89f8bd6c6aa`
+- USDC delivered: `0.035305`
+- Final Pact route state: `success`
+
+### Accounting correction discovered by the canary
+
+The original reconciliation code required every Aurora settlement to be exactly divisible into USD cents. Real swap output can contain valid sub-cent precision, so the successful `0.035305 USDC` transfer was initially rejected by Pact even though the funds were already present in the event vault.
+
+Pact now keeps the complete token amount in atomic units, credits only whole cents so available funds are never overstated, and carries the atomic remainder across later receipts for the same funding request. In this canary, Pact records all `35,305` atomic units, credits `$0.03`, and retains the remaining `5,305` atomic units for future aggregation. Receipt recording remains idempotent by chain ID, transaction hash, and log index.
+
+This distinction matters operationally: Aurora delivery finality and Pact's display-currency accounting are separate checks. A formatting limitation must never cause a valid onchain receipt to appear lost.

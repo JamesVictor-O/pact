@@ -1,7 +1,7 @@
 import "server-only";
 import type { PoolClient, QueryResultRow } from "pg";
 import { database, oneOrNull, transaction } from "./database";
-import type { Invoice, PaymentAgreement, PayoutPreference, PayoutProfile } from "../pact-types";
+import type { Invoice, PayeePayment, PayeeWorkspace, PaymentAgreement, PayoutPreference, PayoutProfile } from "../pact-types";
 
 type AgreementRow = QueryResultRow & {
   id: string; event_id: string; network_chain_id:string; expense_id: string; organizer_user_id: string; payee_id: string; payee_email: string; payee_user_id: string | null;
@@ -27,6 +27,17 @@ export function mapPayout(row: PayoutRow): PayoutProfile { return {userId:row.us
 const agreementSelect = `select * from payment_agreements`;
 const chainId=()=>Number(process.env.MONAD_CHAIN_ID);
 export async function listAccessibleAgreements(userId:string,email:string) { const result=await database().query<AgreementRow>(`${agreementSelect} where network_chain_id=$3 and (organizer_user_id=$1 or payee_email=$2) order by created_at desc`,[userId,email,chainId()]); return result.rows.map(mapAgreement); }
+type PayeePaymentRow=QueryResultRow&{id:string;agreement_id:string;event_id:string;event_name:string;agreement_title:string;label:string;currency:PayeePayment["currency"];amount_minor:string;funded_amount_minor:string;paid_amount_minor:string;due_date:string|Date|null;processing_started_at:Date|null;cancelled_at:Date|null};
+const dateOnly=(value:string|Date|null)=>value?typeof value==="string"?value.slice(0,10):value.toISOString().slice(0,10):undefined;
+export async function getPayeeWorkspace(userId:string,email:string):Promise<PayeeWorkspace>{
+  const [agreements,invoices,payments,payout]=await Promise.all([
+    database().query<AgreementRow>(`${agreementSelect} where network_chain_id=$2 and payee_email=$1 order by created_at desc`,[email,chainId()]),
+    database().query<InvoiceRow>(`select i.* from invoices i join payment_agreements a on a.id=i.agreement_id where a.network_chain_id=$2 and a.payee_email=$1 order by i.created_at desc`,[email,chainId()]),
+    database().query<PayeePaymentRow>(`select p.id,a.id agreement_id,a.event_id,a.snapshot->>'eventName' event_name,a.snapshot->>'title' agreement_title,p.label,a.currency,p.amount_minor,coalesce((select sum(al.amount_minor) from allocations al where al.payment_id=p.id and al.reversed_at is null and al.execution_status='confirmed'),0) funded_amount_minor,p.paid_amount_minor,p.due_date,p.processing_started_at,p.cancelled_at from payment_agreements a join expense_payments p on p.expense_id=a.expense_id where a.network_chain_id=$2 and a.payee_email=$1 order by p.due_date asc nulls last,p.created_at asc`,[email,chainId()]),
+    oneOrNull<PayoutRow>(`select * from payout_profiles where user_id=$1`,[userId]),
+  ]);
+  return{agreements:agreements.rows.map(mapAgreement),invoices:invoices.rows.map(mapInvoice),payments:payments.rows.map(row=>({id:row.id,agreementId:row.agreement_id,eventId:row.event_id,eventName:row.event_name,agreementTitle:row.agreement_title,label:row.label,currency:row.currency,amountMinor:Number(row.amount_minor),fundedAmountMinor:Number(row.funded_amount_minor),paidAmountMinor:Number(row.paid_amount_minor),dueDate:dateOnly(row.due_date),processingStartedAt:iso(row.processing_started_at),cancelledAt:iso(row.cancelled_at)})),payout:payout?mapPayout(payout):null};
+}
 export async function findAccessibleAgreement(id:string,userId:string,email:string) { const row=await oneOrNull<AgreementRow>(`${agreementSelect} where id=$1 and network_chain_id=$4 and (organizer_user_id=$2 or payee_email=$3)`,[id,userId,email,chainId()]); return row?mapAgreement(row):null; }
 export async function findOrganizerAgreementByExpense(expenseId:string,userId:string) { const row=await oneOrNull<AgreementRow>(`${agreementSelect} where expense_id=$1 and organizer_user_id=$2 and network_chain_id=$3`,[expenseId,userId,chainId()]); return row?mapAgreement(row):null; }
 export async function invoiceForAgreement(id:string) { const row=await oneOrNull<InvoiceRow>(`select * from invoices where agreement_id=$1`,[id]); return row?mapInvoice(row):null; }

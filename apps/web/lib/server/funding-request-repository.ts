@@ -4,6 +4,7 @@ import { canonicalBytes32 } from "../agreement-typed-data";
 import { hashCanonical } from "../agreements";
 import type { DisplayCurrency, FundingRequest } from "../pact-types";
 import { database, oneOrNull, transaction } from "./database";
+import { recordConfirmedFundingReceipt } from "./funding-receipt-repository";
 import {createPublicClient,decodeEventLog,http,parseAbiItem,type Address,type Hex} from "viem";
 
 type RequestRow = QueryResultRow & {
@@ -51,15 +52,13 @@ export async function reconcilePublicFundingReceipt(slug:string,transactionHash:
   const client=createPublicClient({transport:http(rpc)}),receipt=await client.getTransactionReceipt({hash:transactionHash as Hex});if(receipt.status!=="success")throw new Error("The funding transaction did not succeed");
   const matched=receipt.logs.filter(log=>log.address.toLowerCase()===token.toLowerCase()).map(log=>{try{return{log,decoded:decodeEventLog({abi:[transferEvent],data:log.data,topics:log.topics})}}catch{return null}}).find(item=>item&&item.decoded.eventName==="Transfer"&&String(item.decoded.args.to).toLowerCase()===request.vault_address!.toLowerCase());
   if(!matched)throw new Error("This transaction does not contain a USDC transfer to this event account");
-  const amountAtomic=BigInt(matched.decoded.args.value),decimals=Number(process.env.PACT_SETTLEMENT_TOKEN_DECIMALS??6),minorDivisor=BigInt(10)**BigInt(decimals-2);
-  if(amountAtomic%minorDivisor!==BigInt(0))throw new Error("The received amount cannot be represented in the event currency");
-  const amountMinor=amountAtomic/minorDivisor;if(amountMinor<=BigInt(0)||amountMinor>BigInt(Number.MAX_SAFE_INTEGER))throw new Error("The received amount is invalid");
+  const amountAtomic=BigInt(matched.decoded.args.value),decimals=Number(process.env.PACT_SETTLEMENT_TOKEN_DECIMALS??6);
+  if(amountAtomic<=BigInt(0))throw new Error("The received amount is invalid");
   return transaction(async db=>{
-    const inserted=await db.query<{id:string}>(`insert into funding_receipts(id,funding_request_id,event_id,contributor_address,settlement_token_address,amount_atomic,amount_minor,chain_id,transaction_hash,log_index,block_number,status,confirmed_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'confirmed',now()) on conflict(chain_id,transaction_hash,log_index) do nothing returning id`,[`receipt_${crypto.randomUUID()}`,request.id,request.event_id,String(matched.decoded.args.from),token,amountAtomic.toString(),amountMinor.toString(),Number(process.env.MONAD_CHAIN_ID??10143),transactionHash.toLowerCase(),matched.log.logIndex.toString(),receipt.blockNumber.toString()]);
-    if(inserted.rowCount){await db.query(`update funding_sources set received_amount_minor=received_amount_minor+$2,updated_at=now() where id=$1`,[request.funding_source_id,amountMinor.toString()]);}
+    const recorded=await recordConfirmedFundingReceipt(db,{id:`receipt_${crypto.randomUUID()}`,fundingRequestId:request.id,eventId:request.event_id,fundingSourceId:request.funding_source_id,contributorAddress:String(matched.decoded.args.from),settlementTokenAddress:token,amountAtomic,tokenDecimals:decimals,chainId:Number(process.env.MONAD_CHAIN_ID??10143),transactionHash,logIndex:matched.log.logIndex,blockNumber:receipt.blockNumber});
     const total=await db.query<{received:string}>(`select coalesce(sum(amount_minor),0) received from funding_receipts where funding_request_id=$1 and status='confirmed'`,[request.id]);const fullyReceived=BigInt(total.rows[0]?.received??0)>=BigInt(request.amount_minor);
     await db.query(`update funding_requests set status=$2,updated_at=now() where id=$1`,[request.id,fullyReceived?"received":"routing"]);
     if(fullyReceived)await db.query(`update invoices set status='paid',paid_at=coalesce(paid_at,now()),updated_at=now() where funding_source_id=$1 and direction='receivable' and snapshot->>'fundingRequestId'=$2`,[request.funding_source_id,request.id]);
-    return{transactionHash:transactionHash.toLowerCase(),amount:major(amountMinor.toString()),status:fullyReceived?"received":"routing" as const};
+    return{transactionHash:transactionHash.toLowerCase(),amount:major(recorded.creditedMinor.toString()),status:fullyReceived?"received":"routing" as const};
   });
 }

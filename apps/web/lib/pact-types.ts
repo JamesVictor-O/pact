@@ -15,6 +15,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
 export const FUNDING_SOURCE_TYPES = [
   "organizer",
   "sponsor",
+  "donor",
   "partner",
   "ticket_revenue",
   "grant",
@@ -213,6 +214,29 @@ export interface ExpensePayment {
   cancelledAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PayeePayment {
+  id: string;
+  agreementId: string;
+  eventId: string;
+  eventName: string;
+  agreementTitle: string;
+  label: string;
+  currency: DisplayCurrency;
+  amountMinor: number;
+  fundedAmountMinor: number;
+  paidAmountMinor: number;
+  dueDate?: string;
+  processingStartedAt?: string;
+  cancelledAt?: string;
+}
+
+export interface PayeeWorkspace {
+  agreements: PaymentAgreement[];
+  invoices: Invoice[];
+  payments: PayeePayment[];
+  payout: PayoutProfile | null;
 }
 
 export interface Allocation {

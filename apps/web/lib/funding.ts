@@ -3,6 +3,7 @@ import type { FundingSource, FundingSourceStatus, FundingSourceType } from "./pa
 export const FUNDING_TYPE_LABELS: Record<FundingSourceType, string> = {
   organizer: "Organizer funds",
   sponsor: "Sponsor",
+  donor: "Donor",
   partner: "Partner",
   ticket_revenue: "Ticket revenue",
   grant: "Grant",
