@@ -23,7 +23,7 @@ export const FUNDING_SOURCE_TYPES = [
 ] as const;
 
 export type FundingSourceType = (typeof FUNDING_SOURCE_TYPES)[number];
-export type FundingSourceStatus = "expected" | "partially_received" | "received" | "overdue" | "cancelled";
+export type FundingSourceStatus = "expected" | "partially_received" | "received" | "overdue" | "cancelled" | "open";
 
 export const EXPENSE_CATEGORIES = ["venue", "production", "catering", "security", "travel", "media", "equipment", "contractor", "other"] as const;
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
@@ -82,6 +82,7 @@ export interface FundingSource {
   committedAmount: number;
   receivedAmount: number;
   allocatedAmount?: number;
+  openContributions?: boolean;
   expectedDate?: string;
   notes?: string;
   cancelledAt?: string;
@@ -97,7 +98,12 @@ export type FundingSourceInput = Pick<
 export type FundingRequestStatus = "draft" | "sent" | "routing" | "received" | "partially_allocated" | "allocated" | "refunded" | "cancelled" | "failed";
 export interface FundingRequest {
   id: string; eventId: string; fundingSourceId: string; publicSlug: string; amount: number; currency: DisplayCurrency;
+  requestKind?: "requested" | "public_contribution";
   status: FundingRequestStatus; onchainRequestId?: string; expiresAt?: string; sentAt?: string; createdAt: string; updatedAt: string;
+}
+
+export interface PublicContributionPage {
+  eventId:string;fundingSourceId:string;fundingRequestId:string;publicSlug:string;enabled:boolean;receivedAmount:number;createdAt:string;updatedAt:string;
 }
 
 export interface FundingReceipt {
@@ -200,6 +206,9 @@ export interface PayoutProfile {
 
 export type PayoutAssetOption={assetId:string;blockchain:string;symbol:string;decimals:number;contractAddress?:string};
 export type PayoutPreference={chain:string;assetId:string;assetSymbol:string;assetDecimals:number;address:string;verification:"pact_account"|"wallet_signature"|"payee_confirmation"};
+
+export type MeraAccountBalance={address:`0x${string}`;assetSymbol:string;assetDecimals:number;balanceAtomic:string;nativeBalanceAtomic:string;chainId:number};
+export type MeraWithdrawalTransaction={chainId:number;nonce:number;to:`0x${string}`;data:`0x${string}`;value:string;gas:string;maxFeePerGas:string;maxPriorityFeePerGas:string};
 
 export interface ExpensePayment {
   /** A scheduled obligation. Actual vendor transfers will use a separate execution record in a later phase. */

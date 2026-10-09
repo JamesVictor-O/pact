@@ -27,6 +27,7 @@ test("funding status is derived from financial state and expected date", () => {
   assert.equal(getFundingSourceStatus(source({ receivedAmount: 10_000 }), beforeDueDate), "received");
   assert.equal(getFundingSourceStatus(source(), afterDueDate), "overdue");
   assert.equal(getFundingSourceStatus(source({ cancelledAt: "2026-09-20T00:00:00.000Z" }), beforeDueDate), "cancelled");
+  assert.equal(getFundingSourceStatus(source({ committedAmount: 0, receivedAmount: 25, openContributions: true }), beforeDueDate), "open");
 });
 
 test("funding summary separates commitments, receipts, expected, and available", () => {

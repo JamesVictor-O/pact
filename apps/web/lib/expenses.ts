@@ -27,6 +27,7 @@ export const VENDOR_PAYOUT_STATUS_LABELS: Record<VendorPayoutStatus, string> = {
 
 export type EventPayment = { expense: Expense; payment: ExpensePayment };
 export type PaymentFilter = "all" | "attention" | "ready" | "upcoming" | "paid";
+export type FundingShortfall = { paymentCount: number; secured: number; gap: number };
 
 function localDateValue(date = new Date()): string {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
@@ -91,6 +92,17 @@ export function getPaymentFundingGap(payment: ExpensePayment): number {
 
 export function getExpenseFundingGap(record: ExpenseRecord): number {
   return record.payments.filter((payment) => !payment.cancelledAt).reduce((total, payment) => total + getPaymentFundingGap(payment), 0);
+}
+
+export function getOverdueFundingShortfall(record: ExpenseRecord, today = new Date()): FundingShortfall | null {
+  if (record.expense.cancelledAt) return null;
+  const blocked = record.payments.filter((payment) => !payment.cancelledAt && payment.paidAmount < payment.amount && getPaymentStatus(payment, today) === "overdue" && getPaymentFundingGap(payment) > 0);
+  if (!blocked.length) return null;
+  return {
+    paymentCount: blocked.length,
+    secured: blocked.reduce((total, payment) => total + Math.min(payment.fundedAmount, payment.amount), 0),
+    gap: blocked.reduce((total, payment) => total + getPaymentFundingGap(payment), 0),
+  };
 }
 
 export function getExpenseStatus(record: ExpenseRecord, today = new Date()): ExpenseStatus {

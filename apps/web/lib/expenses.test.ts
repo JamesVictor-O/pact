@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterEventPayments, getEventPayments, getExpenseStatus, getExpenseSummary, getNextPayment, getPaymentDueLabel, getPaymentFundingGap, getPaymentOperationalStatus, getPaymentReadiness, getPaymentStatus, getPaymentSummary } from "./expenses.ts";
+import { filterEventPayments, getEventPayments, getExpenseStatus, getExpenseSummary, getNextPayment, getOverdueFundingShortfall, getPaymentDueLabel, getPaymentFundingGap, getPaymentOperationalStatus, getPaymentReadiness, getPaymentStatus, getPaymentSummary } from "./expenses.ts";
 import type { ExpensePayment, ExpenseRecord } from "./pact-types.ts";
 
 function payment(overrides: Partial<ExpensePayment> = {}): ExpensePayment {
@@ -32,6 +32,15 @@ test("next payment and funding gaps are derived per schedule item", () => {
   const earlier = payment({ id: "earlier", dueDate: "2026-10-05", fundedAmount: 3_000 });
   assert.equal(getNextPayment(record([later, earlier]))?.id, "earlier");
   assert.equal(getPaymentFundingGap(later), 4_000);
+});
+
+test("overdue shortfall preserves secured funds and reports only blocked payments", () => {
+  const result = getOverdueFundingShortfall(record([
+    payment({ amount: 50, fundedAmount: 0.03, dueDate: "2026-10-07" }),
+    payment({ id: "payment_2", amount: 50, fundedAmount: 0, dueDate: "2026-10-08" }),
+    payment({ id: "payment_3", amount: 25, fundedAmount: 25, paidAmount: 25, dueDate: "2026-10-01" }),
+  ]), new Date("2026-10-09T12:00:00Z"));
+  assert.deepEqual(result, { paymentCount: 2, secured: 0.03, gap: 99.97 });
 });
 
 test("operational status keeps overdue separate from funding and payout readiness", () => {

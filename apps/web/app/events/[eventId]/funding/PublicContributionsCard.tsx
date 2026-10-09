@@ -1,0 +1,15 @@
+"use client";
+import {Check,Copy,HeartHandshake,LoaderCircle,Power,PowerOff} from "lucide-react";
+import {useEffect,useState} from "react";
+import {financialApi} from "../../../../lib/financial-api";
+import {formatEventCurrency} from "../../../../lib/funding";
+import type {PactEvent,PublicContributionPage} from "../../../../lib/pact-types";
+
+export default function PublicContributionsCard({event}:{event:PactEvent}){
+  const[page,setPage]=useState<PublicContributionPage|null>(null),[state,setState]=useState<"loading"|"idle"|"working"|"error">("loading"),[copied,setCopied]=useState(false),[error,setError]=useState("");
+  useEffect(()=>{let live=true;financialApi.contributionPage(event.id).then(value=>{if(live){setPage(value);setState("idle");}}).catch(reason=>{if(live){setError(reason instanceof Error?reason.message:"Could not load public contributions");setState("error");}});return()=>{live=false};},[event.id]);
+  const url=page&&typeof window!=="undefined"?`${window.location.origin}/support/${page.publicSlug}`:"";
+  async function toggle(){setState("working");setError("");try{const next=page?.enabled?await financialApi.disableContributions(event.id):await financialApi.enableContributions(event.id);setPage(next);setState("idle");}catch(reason){setError(reason instanceof Error?reason.message:"Could not update public contributions");setState("error");}}
+  async function copy(){if(!url)return;await navigator.clipboard.writeText(url);setCopied(true);window.setTimeout(()=>setCopied(false),1600);}
+  return <section className="public-contributions-card" aria-labelledby="public-contributions-heading"><span className="public-contributions-icon"><HeartHandshake aria-hidden="true"/></span><div><p className="app-eyebrow">Open community support</p><h2 id="public-contributions-heading">Accept public contributions</h2><p>Share one event link. Every confirmed transfer is recorded separately, while contributors reuse the event’s route for their network.</p>{page&&<p className="public-contributions-received">Received through this page <strong>{formatEventCurrency(page.receivedAmount,event.displayCurrency)}</strong></p>}{error&&<p className="field-error" role="alert">{error}</p>}</div><div className="public-contributions-actions">{state==="loading"?<LoaderCircle className="button-spinner" aria-label="Loading"/>:page?.enabled?<><button className="app-secondary-button" type="button" onClick={()=>void copy()}>{copied?<Check aria-hidden="true"/>:<Copy aria-hidden="true"/>}{copied?"Copied":"Copy public link"}</button><button className="public-contributions-toggle" type="button" onClick={()=>void toggle()} disabled={state==="working"}><PowerOff aria-hidden="true"/>Pause</button></>:<button className="app-primary-button" type="button" onClick={()=>void toggle()} disabled={state==="working"||event.vaultStatus!=="ready"}>{state==="working"?<LoaderCircle className="button-spinner" aria-hidden="true"/>:<Power aria-hidden="true"/>}{page?"Resume contributions":"Enable contributions"}</button>}</div></section>;
+}

@@ -5,7 +5,7 @@ import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 import { toViemAccount } from "@category-labs/mera/viem";
 import { hexToBytes, keccak256 } from "viem";
 import { acceptanceTypes, canonicalBytes32, currencyBytes32, eventAllocationTypes, eventPaymentReleaseTypes, eventPaymentRouteTypes, eventVaultAuthorizationTypes, eventVaultDomain, eventVaultFactoryDomain, proposalDigest, proposalTypes, registryDomain } from "./agreement-typed-data";
-import type { Invoice, PaymentAgreement, VaultExecutionChallenge } from "./pact-types";
+import type { Invoice, MeraWithdrawalTransaction, PaymentAgreement, VaultExecutionChallenge } from "./pact-types";
 
 const LEGACY_CREDENTIAL_KEY = "pact.mera-credential.v1";
 const credentialKey = (userId:string) => `pact.mera-credential.v2:${userId}`;
@@ -59,6 +59,13 @@ export class PactAccountAdapter {
   async signPaymentRelease(userId:string,challenge:VaultExecutionChallenge) {
     if(!challenge.payoutAddress)throw new Error("The verified payout destination is missing");
     return this.signVaultInstruction(userId,challenge,"EventPaymentRelease");
+  }
+
+  async signWithdrawal(userId:string,transaction:MeraWithdrawalTransaction){
+    const stored=JSON.parse(localStorage.getItem(credentialKey(userId.trim().toLowerCase()))??"null") as StoredCredential|null;
+    if(!stored)throw new Error("Secure Pact account is not configured on this device");
+    const unlocked=await getPasskeyPrfOutput({rpId:window.location.hostname,credential:stored});
+    return this.withAccount(unlocked.prfOutput,async account=>account.signTransaction({type:"eip1559",chainId:transaction.chainId,nonce:transaction.nonce,to:transaction.to,data:transaction.data,value:BigInt(transaction.value),gas:BigInt(transaction.gas),maxFeePerGas:BigInt(transaction.maxFeePerGas),maxPriorityFeePerGas:BigInt(transaction.maxPriorityFeePerGas)}));
   }
 
   async signAgreement(userId:string, agreement: PaymentAgreement, invoice: Invoice) {

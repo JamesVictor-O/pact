@@ -325,6 +325,15 @@
 .payment-schedule-row small { margin-top: 3px; color: var(--error); font-size: 10px; }
 .payment-schedule-row > span:not(:first-child) { font-variant-numeric: tabular-nums; }
 .expense-detail-grid { margin-top: 52px; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, .7fr); gap: 24px; }
+.funding-shortfall { margin-top: 28px; padding: 24px 28px; border: 1px solid color-mix(in srgb, var(--error) 34%, var(--line)); border-radius: var(--radius-card); display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 20px; background: color-mix(in srgb, var(--peach) 24%, var(--surface)); }
+.funding-shortfall-icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--peach); color: var(--error); }
+.funding-shortfall-icon svg { width: 20px; height: 20px; }
+.funding-shortfall h2 { margin-top: 5px; font-size: 18px; letter-spacing: -.02em; }
+.funding-shortfall p:not(.app-eyebrow) { max-width: 660px; margin-top: 6px; color: var(--muted); font-size: 11px; }
+.funding-shortfall small { display: block; margin-top: 7px; color: var(--error); font-size: 10px; font-weight: 600; }
+.funding-shortfall-actions, .payment-recovery-actions { display: flex; align-items: center; gap: 8px; }
+.payment-reservation-note { margin-top: 12px; color: var(--error) !important; font-size: 11px; font-weight: 600; }
+.payment-recovery-actions { justify-content: flex-end; flex-wrap: wrap; }
 .expense-allocation-empty { margin-top: 32px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .expense-allocation-empty > span { display: grid; }
 .expense-allocation-empty small { margin-top: 4px; color: var(--muted); font-size: 10px; }
@@ -514,6 +523,23 @@
 .payee-payment-entry i b { height: 100%; display: block; border-radius: inherit; background: var(--success); }
 .payee-payment-entry > span:nth-child(4) strong { font-variant-numeric: tabular-nums; }
 .payee-payout-card { margin-top: 48px; padding: 30px; border: 1px solid var(--line); border-radius: var(--radius-card); display: grid; grid-template-columns: 56px minmax(0,1fr) auto; align-items: center; gap: 22px; background: var(--surface); }
+.mera-account-card { margin-top: 48px; padding: 30px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.mera-account-card > header { display: grid; grid-template-columns: 56px 1fr; align-items: center; gap: 22px; }
+.mera-account-card > header > div { display: grid; }
+.mera-account-card h2 { margin-top: 2px; font-size: 28px; font-variant-numeric: tabular-nums; }
+.mera-account-card p, .mera-account-card small { color: var(--muted); font-size: 11px; }
+.mera-address { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 12px; }
+.mera-address > span { min-width: 0; display: grid; gap: 4px; }
+.mera-address code { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.mera-withdrawal { margin-top: 20px; padding: 28px 30px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.mera-withdrawal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.mera-withdrawal > header h2 { font-size: 22px; }
+.mera-withdrawal > header > button { width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; display: grid; place-items: center; background: var(--surface); }
+.mera-withdrawal > header > button svg { width: 16px; height: 16px; }
+.mera-withdrawal form { margin-top: 22px; }
+.mera-withdrawal form .app-primary-button { width: 100%; margin-top: 22px; }
+.mera-gas-note { margin-top: 16px; color: var(--muted); font-size: 11px; }
+.mera-withdrawal .app-banner { margin-top: 18px; overflow-wrap: anywhere; }
 .payee-payout-icon { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; background: var(--mint); color: var(--success); }
 .payee-payout-card > div { display: grid; }
 .payee-payout-card h2 { margin-top: 2px; font-size: 24px; }
@@ -626,6 +652,20 @@
 .sponsor-transfer-detail button { align-self: start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; cursor: pointer; font: inherit; font-size: 12px; }
 .sponsor-transfer-detail button svg { width: 14px; }
 .event-vault-card { display: grid; grid-template-columns: minmax(0,.92fr) minmax(400px,1.08fr); gap: 32px; margin: 32px 0 28px; padding: 32px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); }
+.public-contributions-card { display: grid; grid-template-columns: 54px minmax(0,1fr) auto; align-items: center; gap: 20px; margin: 0 0 28px; padding: 28px 32px; border: 1px solid #d7e9df; border-radius: 24px; background: #f6fbf8; }
+.public-contributions-icon { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; color: #167747; background: #ddf4e7; }
+.public-contributions-icon svg { width: 24px; height: 24px; }
+.public-contributions-card h2 { margin: 5px 0 6px; font-size: 20px; }
+.public-contributions-card p { max-width: 700px; margin: 0; color: var(--muted); }
+.public-contributions-card .public-contributions-received { margin-top: 12px; color: var(--ink); }
+.public-contributions-actions { display: flex; align-items: center; gap: 10px; }
+.public-contributions-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 0; color: var(--muted); background: transparent; cursor: pointer; }
+.public-contributions-toggle svg { width: 17px; }
+.public-contribution-total { display: flex; align-items: center; gap: 16px; margin: 24px 0; padding: 20px; border-radius: 18px; background: #f1f8f4; }
+.public-contribution-total > svg { width: 28px; height: 28px; color: #167747; }
+.public-contribution-total span { display: grid; gap: 4px; }
+.public-contribution-total small { color: var(--muted); }
+.public-contribution-total strong { font-size: 24px; }
 .event-vault-card.is-pending { grid-template-columns: minmax(0,1fr) auto; }
 .event-vault-intro { display: flex; align-items: flex-start; gap: 16px; }
 .event-vault-icon { flex: 0 0 auto; display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; background: var(--mint); color: var(--success); }
@@ -652,7 +692,9 @@
 .event-vault-setup p { max-width: 420px; font-size: 13px; }
 .event-vault-error { grid-column: 1 / -1; }
 @media (max-width: 940px) { .event-vault-card, .event-vault-card.is-pending { grid-template-columns: 1fr; } .event-vault-details { padding: 24px 0 0 64px; border-top: 1px solid var(--line); border-left: 0; } }
+@media (max-width: 940px) { .public-contributions-card { grid-template-columns: 54px 1fr; } .public-contributions-actions { grid-column: 2; justify-content: flex-start; } }
 @media (max-width: 620px) { .event-vault-card { margin-top: 24px; padding: 20px; gap: 22px; } .event-vault-details { padding: 22px 0 0; } .event-vault-details dl { gap: 32px; } .event-vault-address { grid-template-columns: 1fr; } .event-vault-address > * { grid-column: 1; } .event-vault-address code { white-space: normal; overflow-wrap: anywhere; } .event-vault-address .app-secondary-button, .event-vault-setup .app-secondary-button { width: 100%; } .event-vault-setup { align-items: stretch; flex-direction: column; } }
+@media (max-width: 620px) { .public-contributions-card { grid-template-columns: 42px 1fr; padding: 20px; } .public-contributions-icon { width: 42px; height: 42px; } .public-contributions-actions { grid-column: 1 / -1; align-items: stretch; flex-direction: column; } .public-contributions-actions .app-primary-button, .public-contributions-actions .app-secondary-button { width: 100%; } }
 .aurora-route-card { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
 .aurora-route-heading { display: flex; align-items: flex-start; gap: 12px; }
 .aurora-route-heading > svg { width: 20px; margin-top: 2px; color: var(--accent); }
@@ -761,6 +803,8 @@
   .summary-grid article:nth-child(4) { border-top: 1px solid var(--line); }
   .funding-detail-grid { grid-template-columns: 1fr; }
   .expense-detail-grid { grid-template-columns: 1fr; }
+  .funding-shortfall { grid-template-columns: 44px minmax(0, 1fr); }
+  .funding-shortfall-actions { grid-column: 1 / -1; justify-content: flex-end; }
   .payment-summary-grid { grid-template-columns: repeat(3, 1fr); }
   .payment-summary-grid article:nth-child(4) { border-left: 0; }
   .payment-summary-grid article:nth-child(n + 4) { border-top: 1px solid var(--line); }
@@ -796,6 +840,11 @@
   .payee-payment-entry > .payee-status { justify-self: start; }
   .payee-payment-entry > svg { display: none; }
   .payee-payout-card { padding: 24px 20px; grid-template-columns: 48px 1fr; }
+  .mera-account-card { padding: 24px 20px; }
+  .mera-account-card > header { grid-template-columns: 48px 1fr; }
+  .mera-address { grid-template-columns: 1fr; }
+  .mera-address .app-secondary-button, .mera-address .app-primary-button { width: 100%; }
+  .mera-withdrawal { padding: 24px 20px; }
   .payee-payout-icon { width: 48px; height: 48px; }
   .payee-payout-card .app-secondary-button { grid-column: 1 / -1; width: 100%; }
   .payee-payout-card code { grid-column: 1 / -1; }
@@ -868,6 +917,10 @@
   .schedule-totals { align-items: stretch; justify-content: stretch; gap: 12px; }
   .schedule-totals > span { width: 50%; text-align: left; }
   .payment-schedule-section > header { align-items: flex-start; flex-direction: column; }
+  .funding-shortfall { padding: 22px; grid-template-columns: 1fr; }
+  .funding-shortfall-icon { width: 40px; height: 40px; }
+  .funding-shortfall-actions, .payment-recovery-actions { width: 100%; align-items: stretch; flex-direction: column; }
+  .funding-shortfall-actions .app-primary-button, .funding-shortfall-actions .app-secondary-button, .payment-recovery-actions .app-primary-button, .payment-recovery-actions .app-secondary-button { width: 100%; }
   .payment-schedule-head { display: none; }
   .payment-schedule-row { padding: 18px 0; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
   .payment-schedule-row > span:first-child { grid-column: 1 / -1; }
@@ -903,6 +956,7 @@
   .payment-summary-grid article + article { border-left: 0; border-top: 1px solid var(--line); }
   .payment-readiness { padding: 22px 18px; grid-template-columns: 40px 1fr; border-radius: 22px; }
   .payment-readiness .payment-release-button { grid-column: 1 / -1; width: 100%; }
+  .payment-readiness .payment-recovery-actions { grid-column: 1 / -1; }
   .payment-execution-state { align-items: stretch; flex-direction: column; }
   .payment-execution-state .app-secondary-button { width: 100%; justify-content: center; }
   .payment-readiness-icon { width: 40px; height: 40px; }

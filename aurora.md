@@ -453,3 +453,88 @@ The original reconciliation code required every Aurora settlement to be exactly 
 Pact now keeps the complete token amount in atomic units, credits only whole cents so available funds are never overstated, and carries the atomic remainder across later receipts for the same funding request. In this canary, Pact records all `35,305` atomic units, credits `$0.03`, and retains the remaining `5,305` atomic units for future aggregation. Receipt recording remains idempotent by chain ID, transaction hash, and log index.
 
 This distinction matters operationally: Aurora delivery finality and Pact's display-currency accounting are separate checks. A formatting limitation must never cause a valid onchain receipt to appear lost.
+
+## 18. Stellar route isolation correction, October 9, 2026
+
+The first Stellar test exposed an important difference between account-based EVM deposits and memo-based Stellar deposits. Aurora returned a shared Stellar collection address plus a required memo. Its address-status response also contained historical successful routes that used the same collection address for different recipients and destination chains.
+
+Pact initially treated every success returned for that address as belonging to the new funding request. It attempted to verify an old Base settlement hash against the Monad RPC and produced a misleading `Transaction receipt ... could not be found` error.
+
+The reconciliation path now filters every Aurora observation before storing or processing it. An observation must:
+
+- be created after the Pact route;
+- use the route's deposit address;
+- identify the route's event-vault recipient;
+- match the selected source family for a received deposit; and
+- match the exact destination chain and asset for a success or failure.
+
+A genuine Monad settlement reported before the configured RPC can return its receipt is now retained as `deposit_received` with a retryable confirmation message instead of failing the sync request.
+
+For Stellar, the address and memo are one payment instruction. Pact displays both, and the sponsor must include the exact memo. At the time of this correction Aurora had not returned a current `received`, `success`, or `failed` observation for the test route, so Pact correctly remains ready and awaiting detection rather than reconciling unrelated address history.
+
+## 19. Chain-neutral transaction reconciliation, October 9, 2026
+
+The Stellar payment later appeared as successful in Aurora's dashboard and `0.212437 USDC` was visibly present in the Monad event vault, but the Persistent Address status endpoint still returned no current observation for the public Stellar address. The endpoint returned older activity attached to the shared collection address instead. This proved that filtering the address-status response was safe but insufficient: Pact could reject unrelated records, yet it still could not discover the valid settlement.
+
+The final correction is deliberately not Stellar-specific. Pact now combines two Aurora data planes:
+
+1. `GET /api/persistent-deposit-status/{apiKey}` remains a compatibility and in-progress signal.
+2. `GET /api/transactions/{apiKey}` is the normalized cross-chain settlement record. It provides the origin asset, destination asset, recipient, lifecycle status, exact atomic output, and destination-chain transaction hashes across EVM, Stellar, Solana, Bitcoin, NEAR, Tron, and other supported source families.
+3. `GET /api/tokens/{apiKey}` maps each origin asset ID to its blockchain. Pact normalizes those blockchains into source families instead of assuming every transaction hash is EVM-shaped.
+4. Pact correlates a transaction using the route creation time, normalized source family, exact destination asset, and exact event-vault recipient. When Aurora exposes the public deposit address and memo, Pact requires those values to match as well.
+5. If an internal Aurora deposit identifier replaces the public address in transaction history, Pact accepts the record only when exactly one unresolved route can own it. If multiple routes qualify, Pact records an attribution warning and credits nothing. It never guesses which sponsor supplied the money.
+6. After correlation, Pact still fetches the destination transaction receipt from Monad and verifies the canonical USDC contract, event-vault recipient, atomic amount, transaction status, transaction hash, and log index. Aurora success alone is not financial finality.
+7. Database uniqueness on `(chain_id, transaction_hash, log_index)` makes retries idempotent. Repeated reconciliation cannot credit the same transfer twice.
+
+Memo-bearing route identities are now unique by source family, public deposit address, and memo. This permits shared collection addresses without collapsing separate sponsor routes.
+
+### Successful non-EVM canary
+
+- Source family: Stellar
+- Source asset: XLM
+- Public collection address: `GDJ4JZXZELZD737NVFORH4PSSQDWFDZTKW3AIDKHYQG23ZXBPDGGQBJK`
+- Required memo: `195835458`
+- Destination event vault: `0xa34C4648428Af097bdFA5d655f104b1742CA5e3A`
+- Monad settlement transaction: `0x5dede1f53f3ad2ed6bf69a385102525149d5b12c37758b42871a421d5dc46712`
+- Exact USDC delivered: `0.212437`
+- Pact accounting credit: `$0.21`, with `2,437` atomic units retained as the sub-cent remainder
+- Final funding-request state: `received`
+- Final Aurora route state: `success`
+
+The reconciler was executed twice against the same live transaction. The ledger remained at one receipt containing `212,437` atomic units and `21` credited cents, proving retry idempotency.
+
+The web suite now contains 30 passing tests, including source-family normalization, non-EVM history correlation, memo validation, stale shared-address rejection, fractional settlement accounting, and retry-safe receipt insertion. TypeScript checking also passes.
+
+## 20. Public event contributions
+
+Requested sponsor funding and unsolicited community support are different financial states. A sponsor request starts with a known commitment and a receivable invoice. A public contribution has no prior commitment and must not increase funding until value actually arrives.
+
+Pact now supports one reusable public contribution page per event:
+
+```text
+Organizer enables public contributions
+        ↓
+Pact creates one zero-commitment "Community contributions" ledger source
+        ↓
+Pact creates one permanent public funding request for routing identity
+        ↓
+Donors reuse one Aurora Persistent Address per source family
+        ↓
+Every source transfer remains an independent Aurora transaction
+        ↓
+Pact verifies each Monad USDC receipt and credits it exactly once
+```
+
+The public page uses a stable sender reference tied to the event's permanent public funding request. It does not generate a persistent address for each browser, donor, or donation. One hundred anonymous EVM contributors therefore reuse the event's EVM route; Solana contributors reuse its Solana route; Bitcoin contributors reuse its Bitcoin route; and so on. Stellar continues to display its required memo as part of the payment instruction.
+
+The accounting rules are:
+
+- committed amount remains zero because the contribution was never promised;
+- received funding increases only after verified destination settlement;
+- each transaction is stored as a separate receipt with atomic precision;
+- contributors are anonymous unless they independently provide identity in a future named-contribution flow;
+- pausing the public page prevents new route creation and synchronization through the public link without deleting prior receipts;
+- request-specific sponsor and grant invoices remain a separate flow; and
+- ambiguous cross-route attribution fails closed instead of assigning money to the wrong contributor.
+
+The organizer can enable, pause, resume, and copy the public support link from the Funding page. The public URL is `/support/{slug}` and requires no Pact account.

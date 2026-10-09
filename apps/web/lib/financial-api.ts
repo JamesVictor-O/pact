@@ -1,6 +1,6 @@
 "use client";
 import { getAuthToken } from "@dynamic-labs/sdk-react-core";
-import type { Allocation, CreatePactEventInput, ExpenseInput, ExpenseRecord, FundingRequest, FundingSource, FundingSourceInput, PactEvent, PaymentSettlement, VaultExecutionAuthorization, VaultExecutionChallenge } from "./pact-types";
+import type { Allocation, CreatePactEventInput, ExpenseInput, ExpenseRecord, FundingRequest, FundingSource, FundingSourceInput, PactEvent, PaymentSettlement, PublicContributionPage, VaultExecutionAuthorization, VaultExecutionChallenge } from "./pact-types";
 async function request<T>(path:string,init?:RequestInit){const token=getAuthToken();if(!token)throw new Error("Your authenticated session is unavailable");const response=await fetch(path,{...init,headers:{"content-type":"application/json",authorization:`Bearer ${token}`,...init?.headers},cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Request failed");return body as T;}
 export const financialApi={
   listEvents:async()=>(await request<{events:PactEvent[]}>("/api/events")).events,
@@ -14,6 +14,9 @@ export const financialApi={
   cancelFunding:async(id:string)=>(await request<{source:FundingSource}>(`/api/funding/${id}`,{method:"DELETE"})).source,
   fundingRequests:async(id:string)=>(await request<{requests:FundingRequest[]}>(`/api/funding/${id}/requests`)).requests,
   createFundingRequest:async(id:string,amount?:number)=>(await request<{request:FundingRequest}>(`/api/funding/${id}/requests`,{method:"POST",body:JSON.stringify({amount})})).request,
+  contributionPage:async(eventId:string)=>(await request<{page:PublicContributionPage|null}>(`/api/events/${eventId}/contributions`)).page,
+  enableContributions:async(eventId:string)=>(await request<{page:PublicContributionPage}>(`/api/events/${eventId}/contributions`,{method:"POST"})).page,
+  disableContributions:async(eventId:string)=>(await request<{page:PublicContributionPage}>(`/api/events/${eventId}/contributions`,{method:"DELETE"})).page,
   listExpenses:async(eventId:string)=>(await request<{records:ExpenseRecord[]}>(`/api/events/${eventId}/expenses`)).records,
   getExpense:async(id:string)=>(await request<{record:ExpenseRecord}>(`/api/expenses/${id}`)).record,
   getPayment:async(id:string)=>(await request<{record:ExpenseRecord}>(`/api/payments/${id}`)).record,

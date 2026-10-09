@@ -10,6 +10,7 @@ import type { FundingSource } from "../../../../lib/pact-types";
 import { useCurrentEvent } from "../EventShell";
 import { usePactAuth } from "../../../components/PactAuthProvider";
 import { pactAccountAdapter } from "../../../../lib/pact-account-adapter";
+import PublicContributionsCard from "./PublicContributionsCard";
 
 export default function FundingPage() {
   const event = useCurrentEvent();
@@ -54,6 +55,8 @@ export default function FundingPage() {
       {event.vaultAddress?<div className="event-vault-details"><dl><div><dt>Network</dt><dd>{networkLabel}</dd></div><div><dt>Settlement asset</dt><dd>USDC</dd></div></dl><div className={`event-vault-address${copyStatus==="error"?" has-error":""}`}><span>Event receiving address</span><code title={event.vaultAddress}>{event.vaultAddress}</code><button className="app-secondary-button" type="button" onClick={()=>void copyVaultAddress()} aria-label={copyStatus==="copied"?"Event receiving address copied":"Copy event receiving address"}>{copyStatus==="copied"?<CheckCircle2 aria-hidden="true"/>:<Copy aria-hidden="true"/>}{copyStatus==="copied"?"Copied":"Copy address"}</button></div><p className={`event-vault-copy-status${copyStatus==="error"?" is-error":""}`} aria-live="polite">{copyStatus==="error"?"Couldn’t copy automatically. Select the address and copy it manually.":copyStatus==="copied"?"Address copied to your clipboard.":"Share this address only for USDC transfers on the network shown above."}</p></div>:<div className="event-vault-setup"><p>{event.vaultStatus==="not_started"?"Create a permanent account for this event before sending funding links.":"The signed setup is safe. Try finalizing again if this state does not clear."}</p><button className="app-secondary-button" type="button" disabled={vaultAction==="working"} aria-busy={vaultAction==="working"} onClick={()=>void setupVault()}>{vaultAction==="working"?"Finalizing…":event.vaultStatus==="not_started"?"Set up account":"Try again"}</button></div>}
       {vaultAction==="error"&&<p className="event-vault-error field-error" role="alert">Pact couldn’t finalize the event account. Your event is safe—try again.</p>}
     </section>
+
+    <PublicContributionsCard event={event}/>
 
     <section className="funding-summary" aria-labelledby="funding-summary-heading">
       <div className="summary-heading"><h2 id="funding-summary-heading">Funding position</h2><span>{event.displayCurrency}</span></div>

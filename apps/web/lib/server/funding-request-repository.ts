@@ -8,13 +8,13 @@ import { recordConfirmedFundingReceipt } from "./funding-receipt-repository";
 import {createPublicClient,decodeEventLog,http,parseAbiItem,type Address,type Hex} from "viem";
 
 type RequestRow = QueryResultRow & {
-  id:string;event_id:string;funding_source_id:string;public_slug:string;amount_minor:string;currency:DisplayCurrency;
+  id:string;event_id:string;funding_source_id:string;public_slug:string;amount_minor:string;currency:DisplayCurrency;request_kind:"requested"|"public_contribution";
   status:FundingRequest["status"];onchain_request_id:Buffer|null;expires_at:Date|null;sent_at:Date|null;created_at:Date;updated_at:Date;
 };
 type PublicRow = RequestRow & {event_name:string;source_name:string;source_type:string;committed_amount_minor:string;received_amount_minor:string;vault_address:string|null;vault_status:string};
 const major=(value:string|number)=>Number(value)/100;
 const hex=(value:Buffer|null)=>value?`0x${value.toString("hex")}`:undefined;
-const map=(row:RequestRow):FundingRequest=>({id:row.id,eventId:row.event_id,fundingSourceId:row.funding_source_id,publicSlug:row.public_slug,amount:major(row.amount_minor),currency:row.currency,status:row.status,onchainRequestId:hex(row.onchain_request_id),expiresAt:row.expires_at?.toISOString(),sentAt:row.sent_at?.toISOString(),createdAt:row.created_at.toISOString(),updatedAt:row.updated_at.toISOString()});
+const map=(row:RequestRow):FundingRequest=>({id:row.id,eventId:row.event_id,fundingSourceId:row.funding_source_id,publicSlug:row.public_slug,amount:major(row.amount_minor),currency:row.currency,requestKind:row.request_kind,status:row.status,onchainRequestId:hex(row.onchain_request_id),expiresAt:row.expires_at?.toISOString(),sentAt:row.sent_at?.toISOString(),createdAt:row.created_at.toISOString(),updatedAt:row.updated_at.toISOString()});
 
 export type PublicFundingRequest={request:FundingRequest;eventName:string;sourceName:string;sourceType:string;committedAmount:number;receivedAmount:number;treasuryAddress?:string;settlementTokenAddress?:string;chainId:number};
 
@@ -40,7 +40,7 @@ export async function createFundingRequest(sourceId:string,userId:string,amount?
 
 export async function listFundingRequests(sourceId:string,userId:string){const rows=await database().query<RequestRow>(`select r.* from funding_requests r join events e on e.id=r.event_id where r.funding_source_id=$1 and e.owner_user_id=$2 order by r.created_at desc`,[sourceId,userId]);return rows.rows.map(map);}
 
-export async function findPublicFundingRequest(slug:string):Promise<PublicFundingRequest|null>{const row=await oneOrNull<PublicRow>(`select r.*,e.name event_name,e.vault_address,e.vault_status,f.name source_name,f.source_type,f.committed_amount_minor,f.received_amount_minor from funding_requests r join events e on e.id=r.event_id join funding_sources f on f.id=r.funding_source_id where r.public_slug=$1 and r.status not in ('cancelled')`,[slug]);if(!row)return null;return{request:map(row),eventName:row.event_name,sourceName:row.source_name,sourceType:row.source_type,committedAmount:major(row.committed_amount_minor),receivedAmount:major(row.received_amount_minor),treasuryAddress:row.vault_status==="ready"?row.vault_address??undefined:undefined,settlementTokenAddress:process.env.PACT_SETTLEMENT_TOKEN_ADDRESS,chainId:Number(process.env.MONAD_CHAIN_ID??10143)};}
+export async function findPublicFundingRequest(slug:string):Promise<PublicFundingRequest|null>{const row=await oneOrNull<PublicRow>(`select r.*,e.name event_name,e.vault_address,e.vault_status,f.name source_name,f.source_type,f.committed_amount_minor,f.received_amount_minor from funding_requests r join events e on e.id=r.event_id join funding_sources f on f.id=r.funding_source_id where r.public_slug=$1 and r.request_kind='requested' and r.status not in ('cancelled')`,[slug]);if(!row)return null;return{request:map(row),eventName:row.event_name,sourceName:row.source_name,sourceType:row.source_type,committedAmount:major(row.committed_amount_minor),receivedAmount:major(row.received_amount_minor),treasuryAddress:row.vault_status==="ready"?row.vault_address??undefined:undefined,settlementTokenAddress:process.env.PACT_SETTLEMENT_TOKEN_ADDRESS,chainId:Number(process.env.MONAD_CHAIN_ID??10143)};}
 
 const transferEvent=parseAbiItem("event Transfer(address indexed from,address indexed to,uint256 value)");
 export async function reconcilePublicFundingReceipt(slug:string,transactionHash:string){
@@ -56,9 +56,9 @@ export async function reconcilePublicFundingReceipt(slug:string,transactionHash:
   if(amountAtomic<=BigInt(0))throw new Error("The received amount is invalid");
   return transaction(async db=>{
     const recorded=await recordConfirmedFundingReceipt(db,{id:`receipt_${crypto.randomUUID()}`,fundingRequestId:request.id,eventId:request.event_id,fundingSourceId:request.funding_source_id,contributorAddress:String(matched.decoded.args.from),settlementTokenAddress:token,amountAtomic,tokenDecimals:decimals,chainId:Number(process.env.MONAD_CHAIN_ID??10143),transactionHash,logIndex:matched.log.logIndex,blockNumber:receipt.blockNumber});
-    const total=await db.query<{received:string}>(`select coalesce(sum(amount_minor),0) received from funding_receipts where funding_request_id=$1 and status='confirmed'`,[request.id]);const fullyReceived=BigInt(total.rows[0]?.received??0)>=BigInt(request.amount_minor);
+    const total=await db.query<{received:string}>(`select coalesce(sum(amount_minor),0) received from funding_receipts where funding_request_id=$1 and status='confirmed'`,[request.id]);const fullyReceived=request.request_kind==="public_contribution"?BigInt(total.rows[0]?.received??0)>BigInt(0):BigInt(total.rows[0]?.received??0)>=BigInt(request.amount_minor);
     await db.query(`update funding_requests set status=$2,updated_at=now() where id=$1`,[request.id,fullyReceived?"received":"routing"]);
-    if(fullyReceived)await db.query(`update invoices set status='paid',paid_at=coalesce(paid_at,now()),updated_at=now() where funding_source_id=$1 and direction='receivable' and snapshot->>'fundingRequestId'=$2`,[request.funding_source_id,request.id]);
+    if(fullyReceived&&request.request_kind==="requested")await db.query(`update invoices set status='paid',paid_at=coalesce(paid_at,now()),updated_at=now() where funding_source_id=$1 and direction='receivable' and snapshot->>'fundingRequestId'=$2`,[request.funding_source_id,request.id]);
     return{transactionHash:transactionHash.toLowerCase(),amount:major(recorded.creditedMinor.toString()),status:fullyReceived?"received":"routing" as const};
   });
 }

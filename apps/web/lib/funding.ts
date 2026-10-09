@@ -16,10 +16,12 @@ export const FUNDING_STATUS_LABELS: Record<FundingSourceStatus, string> = {
   received: "Received",
   overdue: "Overdue",
   cancelled: "Cancelled",
+  open: "Open",
 };
 
 export function getFundingSourceStatus(source: FundingSource, today = new Date()): FundingSourceStatus {
   if (source.cancelledAt) return "cancelled";
+  if (source.openContributions) return "open";
   if (source.receivedAmount >= source.committedAmount) return "received";
 
   const todayValue = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");

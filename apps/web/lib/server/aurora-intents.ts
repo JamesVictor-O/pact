@@ -6,6 +6,8 @@ export type AuroraDepositChain = (typeof AURORA_DEPOSIT_CHAINS)[number];
 
 export type AuroraPersistentAddress = {depositAddress:string;alreadyExists:boolean;memo?:string;correlationId?:string};
 export type AuroraDepositObservation = {tx_hash:string;fromChain:string|null;destinationChain:string|null;asset_id:string|null;decimals:number|null;amount:string;from?:string;created_at:string;intents_account:string;deposit_address:string;recipient:string};
+export type AuroraTransaction = {originAsset:string;destinationAsset:string;depositAddress:string;depositMemo:string|null;depositAddressAndMemo:string;recipient:string;status:"FAILED"|"INCOMPLETE_DEPOSIT"|"PENDING_DEPOSIT"|"PROCESSING"|"REFUNDED"|"SUCCESS";createdAt:string;intentHashes:string;originChainTxHashes:string[];destinationChainTxHashes:string[];amountIn:string;amountOut:string;senders:string[]};
+export type AuroraToken = {assetId:string;blockchain:string};
 
 export class AuroraIntentsError extends Error {
   readonly status:number;readonly retryAfter?:number;readonly correlationId?:string;
@@ -21,3 +23,7 @@ async function auroraFetch<T>(path:string,init:RequestInit={},fetcher:typeof fet
 export async function createPersistentDepositAddress(input:{recipient:string;sender:string;depositChain:AuroraDepositChain},fetcher?:typeof fetch){const availability=auroraAvailability();if(!availability.enabled)throw new AuroraIntentsError(availability.reason??"Aurora routing is unavailable",503);return auroraFetch<AuroraPersistentAddress>("/api/persistent-deposit-address/{apiKey}",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...input,destinationChain:availability.destinationChain,destinationAsset:availability.destinationAsset,confidential:false})},fetcher);}
 
 export async function getPersistentDepositStatus(address:string,type:"received"|"success"|"failed",fetcher?:typeof fetch){const params=new URLSearchParams({type,address,limit:"100",offset:"0"});return auroraFetch<{deposits:AuroraDepositObservation[]}>(`/api/persistent-deposit-status/{apiKey}?${params}`,{},fetcher);}
+
+export async function getAuroraTransactionHistory(fetcher?:typeof fetch){const response=await auroraFetch<AuroraTransaction[]|{data:AuroraTransaction[]}>("/api/transactions/{apiKey}?numberOfTransactions=1000",{},fetcher);return Array.isArray(response)?response:response.data;}
+
+export async function getAuroraTokenCatalog(fetcher?:typeof fetch){const response=await auroraFetch<{tokens:AuroraToken[]}>("/api/tokens/{apiKey}",{},fetcher);return response.tokens;}

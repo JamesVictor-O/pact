@@ -1,0 +1,8 @@
+import {NextRequest,NextResponse} from "next/server";
+import {requireIdentity} from "../../../../../lib/server/auth";
+import {contributionPageForOwner,disablePublicContributions,enablePublicContributions} from "../../../../../lib/server/public-contribution-repository";
+import {apiError} from "../../../../../lib/server/http";
+
+export async function GET(request:NextRequest,{params}:{params:Promise<{eventId:string}>}){try{const identity=await requireIdentity(request),{eventId}=await params;return NextResponse.json({page:await contributionPageForOwner(eventId,identity.userId)});}catch(error){return apiError(error);}}
+export async function POST(request:NextRequest,{params}:{params:Promise<{eventId:string}>}){try{const identity=await requireIdentity(request),{eventId}=await params;const page=await enablePublicContributions(eventId,identity.userId);return page?NextResponse.json({page},{status:201}):NextResponse.json({error:"Event not found"},{status:404});}catch(error){if(error instanceof Error&&["Public crypto contributions currently require a USD event","Set up the event account before enabling public contributions"].includes(error.message))return NextResponse.json({error:error.message},{status:409});return apiError(error);}}
+export async function DELETE(request:NextRequest,{params}:{params:Promise<{eventId:string}>}){try{const identity=await requireIdentity(request),{eventId}=await params;const page=await disablePublicContributions(eventId,identity.userId);return page?NextResponse.json({page}):NextResponse.json({error:"Contribution page not found"},{status:404});}catch(error){return apiError(error);}}
