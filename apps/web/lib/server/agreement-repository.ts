@@ -43,6 +43,7 @@ export async function findOrganizerAgreementByExpense(expenseId:string,userId:st
 export async function invoiceForAgreement(id:string) { const row=await oneOrNull<InvoiceRow>(`select * from invoices where agreement_id=$1`,[id]); return row?mapInvoice(row):null; }
 export async function accessibleInvoice(id:string,userId:string,email:string) { const row=await oneOrNull<InvoiceRow>(`select i.* from invoices i left join payment_agreements a on a.id=i.agreement_id where i.id=$1 and (a.organizer_user_id=$2 or a.payee_email=$3)`,[id,userId,email]); return row?mapInvoice(row):null; }
 export async function payoutForAgreement(id:string) { const row=await oneOrNull<PayoutRow>(`select p.* from payout_profiles p join payment_agreements a on a.payee_user_id=p.user_id where a.id=$1`,[id]); return row?mapPayout(row):null; }
+export async function payoutForUser(userId:string) { const row=await oneOrNull<PayoutRow>(`select * from payout_profiles where user_id=$1`,[userId]); return row?mapPayout(row):null; }
 
 export type CreateAgreementBundle = { agreement:PaymentAgreement; invoice:Invoice; payeeName:string };
 export async function createAgreementBundle(input:CreateAgreementBundle,userId:string) {
@@ -64,6 +65,16 @@ export async function bindPactAccount(userId:string,address:string) {
   return transaction(async client=>{const existing=await client.query<{signing_address:string}>(`select signing_address from pact_accounts where user_id=$1 for update`,[userId]);if(existing.rows[0]&&existing.rows[0].signing_address.toLowerCase()!==address.toLowerCase())throw new Error("This Pact identity is already bound to another Mera account");await client.query(`insert into pact_accounts(user_id,signing_address,credential_metadata,created_at,updated_at) values($1,$2,$3,now(),now()) on conflict(user_id) do update set updated_at=now()`,[userId,address,JSON.stringify({provider:"mera",custody:"passkey-prf"})]);});
 }
 export async function pactAccountForUser(userId:string) { const row=await oneOrNull<{signing_address:string}>(`select signing_address from pact_accounts where user_id=$1`,[userId]);return row?{signingAddress:row.signing_address}:null; }
+
+export async function updatePayoutPreference(userId:string,payout:{type:PayoutProfile["payoutType"];address:string;preference:PayoutPreference}) {
+  return transaction(async client=>{
+    const current=await client.query<PayoutRow>(`select * from payout_profiles where user_id=$1 for update`,[userId]);
+    if(!current.rows[0])return null;
+    await client.query(`insert into payout_profile_revisions(id,user_id,payout_type,destination_chain,destination_asset_id,destination_asset_symbol,destination_asset_decimals,destination_address,destination_verification) values($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[`payout_revision_${crypto.randomUUID()}`,userId,payout.type,payout.preference.chain,payout.preference.assetId,payout.preference.assetSymbol,payout.preference.assetDecimals,payout.preference.address,payout.preference.verification]);
+    const updated=await client.query<PayoutRow>(`update payout_profiles set payout_type=$2,payout_address=$3,verification_status='verified',verified_at=now(),destination_chain=$4,destination_asset_id=$5,destination_asset_symbol=$6,destination_asset_decimals=$7,destination_address=$8,destination_verification=$9,updated_at=now() where user_id=$1 returning *`,[userId,payout.type,payout.address,payout.preference.chain,payout.preference.assetId,payout.preference.assetSymbol,payout.preference.assetDecimals,payout.preference.address,payout.preference.verification]);
+    return mapPayout(updated.rows[0]!);
+  });
+}
 
 export async function saveAcceptance(id:string,email:string,userId:string,address:string,signature:string,payout:{type:PayoutProfile["payoutType"];address:string;preference:PayoutPreference}) {
   return transaction(async(client)=>{

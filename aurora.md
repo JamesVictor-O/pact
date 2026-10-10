@@ -538,3 +538,49 @@ The accounting rules are:
 - ambiguous cross-route attribution fails closed instead of assigning money to the wrong contributor.
 
 The organizer can enable, pause, resume, and copy the public support link from the Funding page. The public URL is `/support/{slug}` and requires no Pact account.
+
+## 21. Payee-selected outbound settlement
+
+Inbound routing answers how money enters an event. Outbound routing answers where an individual payee wants to receive it. Pact now treats that choice as a verified payee preference rather than an organizer-entered wallet address.
+
+The implemented flow is:
+
+```text
+Payee chooses direct Pact account or another supported USDC network
+        ↓
+Pact validates the destination against Aurora's current token catalog
+        ↓
+EVM destinations prove ownership with a wallet signature
+Non-EVM destinations use chain-aware address validation and explicit confirmation
+        ↓
+Pact stores the verified preference and an immutable revision record
+        ↓
+Organizer fully funds the scheduled payment
+        ↓
+Pact requests an exact-input Aurora quote from Monad USDC
+        ↓
+Organizer signs the exact route ID, deposit address, and amount with Mera
+        ↓
+The event vault transfers only that allocated amount to Aurora's quote address
+        ↓
+Pact submits the deposit transaction and records the payment as routing
+        ↓
+Aurora delivers USDC to the payee's selected network
+        ↓
+Pact requires destination transaction evidence before resolving the vault route as delivered
+```
+
+The payout settings page now loads only unique USDC destinations advertised by Aurora and excludes the Monad USDC origin asset because that path is handled as a direct vault release. A payee can change the preference used by future payments. An existing quote or payment already in routing remains bound to its original recipient, destination asset, and quoted output.
+
+Pact continues to separate identity, authorization, and delivery:
+
+- Dynamic proves which payee is authenticated.
+- Mera remains the payee's Pact signing identity and the organizer's payment-authorization mechanism.
+- Aurora provides the cross-chain quote and delivery lifecycle.
+- Monad keeps the allocation locked until the route is delivered or a refund is verified.
+
+The relayer cannot choose the payee's destination or alter the route. The organizer signs the exact Aurora deposit address and amount through `EventPaymentRoute`. After the Monad transfer confirms, Pact submits the deposit transaction to Aurora and changes the settlement state to `routing`, never directly to `paid`.
+
+Aurora `SUCCESS` must include a destination-chain transaction hash before Pact marks the scheduled payment paid. `REFUNDED` restores the allocation only after the route resolver confirms the refunded state. A failure without a verified refund leaves the money locked in routing rather than making it available for a second payment.
+
+Migration `014_payout_profile_revisions.sql` adds an audit trail for preference changes. The local environment now enables outbound payouts, but production enablement still requires the same Aurora origin asset ID, Monad chain, settlement token, upgraded route-resolution vault, and a live delivery-and-refund canary. Contract/API implementation is complete; outbound production delivery must not be claimed until those canaries pass.

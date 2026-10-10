@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { privateKeyToAccount } from "viem/accounts";
 import { verifyMessage } from "viem";
-import { payoutVerificationMessage } from "./payout-verification.ts";
+import { payoutPreferenceVerificationMessage, payoutVerificationMessage } from "./payout-verification.ts";
 
 test("payout proof is bound to agreement, user, network, and checksum address", async () => {
   const account=privateKeyToAccount("0x0123456789012345678901234567890123456789012345678901234567890123");
@@ -15,4 +15,13 @@ test("payout proof is bound to agreement, user, network, and checksum address", 
   const signature=await account.signMessage({message});
   assert.equal(await verifyMessage({address:account.address,message,signature}),true);
   assert.equal(await verifyMessage({address:account.address,message:message.replace("agreement_123","agreement_999"),signature}),false);
+});
+
+test("payout preference proof is bound to user, destination asset, and address",async()=>{
+  const account=privateKeyToAccount("0x0123456789012345678901234567890123456789012345678901234567890123");
+  const message=payoutPreferenceVerificationMessage({userId:"user_456",assetId:"base-usdc",address:account.address});
+  const signature=await account.signMessage({message});
+  assert.match(message,/Destination asset: base-usdc/);
+  assert.equal(await verifyMessage({address:account.address,message,signature}),true);
+  assert.equal(await verifyMessage({address:account.address,message:message.replace("base-usdc","arbitrum-usdc"),signature}),false);
 });

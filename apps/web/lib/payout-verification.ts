@@ -12,3 +12,15 @@ export function payoutVerificationMessage(input:{agreementId:string;userId:strin
     "This does not send a transaction or grant spending permission.",
   ].join("\n");
 }
+
+export function payoutPreferenceVerificationMessage(input:{userId:string;address:string;assetId:string}) {
+  return [
+    "Verify this wallet as your Pact payout destination.",
+    "",
+    `Pact user: ${input.userId}`,
+    `Destination asset: ${input.assetId}`,
+    `Payout address: ${getAddress(input.address)}`,
+    "",
+    "This does not send a transaction or grant spending permission.",
+  ].join("\n");
+}

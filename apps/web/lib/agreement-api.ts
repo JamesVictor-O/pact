@@ -19,6 +19,8 @@ export async function submitProposal(id:string,input:{address:string;signature:s
 export type PayoutSelection=({type:"mera";address:string}|{type:"external_wallet";address:string;message?:string;signature?:string})&{preference:PayoutPreference};
 export async function listPayoutAssets(){return request<{assets:PayoutAssetOption[];enabled:boolean;reason?:string}>("/api/payout-options");}
 export async function createPayoutChallenge(id:string,address:string){return request<{message:string;address:string;chainId:number}>(`/api/agreements/${id}/payout-challenge`,{method:"POST",body:JSON.stringify({address})});}
-export async function acceptAgreement(id:string,input:{address:string;signature:string;payout:PayoutSelection}){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/accept`,{method:"POST",body:JSON.stringify(input)})).agreement;}
+export async function createPayoutPreferenceChallenge(assetId:string,address:string){return request<{message:string;address:string}>("/api/payout-profile/challenge",{method:"POST",body:JSON.stringify({assetId,address})});}
+export async function updatePayoutProfile(input:{mode:"mera"|"external_wallet";assetId?:string;address?:string;message?:string;signature?:string;confirmed?:boolean}){return (await request<{payout:PayoutProfile}>("/api/payout-profile",{method:"PATCH",body:JSON.stringify(input)})).payout;}
+export async function acceptAgreement(id:string,input:{address:string;signature:string;payout?:PayoutSelection}){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/accept`,{method:"POST",body:JSON.stringify(input)})).agreement;}
 export async function retryAgreement(id:string){return (await request<{agreement:PaymentAgreement}>(`/api/agreements/${id}/retry`,{method:"POST"})).agreement;}
 export async function getInvoice(id:string){return (await request<{invoice:Invoice}>(`/api/invoices/${id}`)).invoice;}
