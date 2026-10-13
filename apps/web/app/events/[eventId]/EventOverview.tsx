@@ -36,7 +36,7 @@ export default function EventOverview() {
   ];
 
   return <div className="overview-page">
-    {justCreated && <div className="app-banner app-banner-success" role="status"><Check aria-hidden="true" /><span><strong>Your Pact is ready.</strong> Start by adding where money will come from or what the event needs to pay.</span></div>}
+    {justCreated && <div className="app-banner app-banner-success" role="status"><Check aria-hidden="true" /><span><strong>Event created.</strong> Add where money will come from or what the event needs to pay.</span></div>}
     <header className="overview-header"><div><p className="app-eyebrow">Event overview</p><h1>{event.name}</h1><p>{formatDate(event.date)}{event.eventType ? ` · ${event.eventType}` : ""}</p></div><span className="status-pill"><i /> Active</span></header>
 
     <section className="financial-summary" aria-labelledby="financial-summary-heading">

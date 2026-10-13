@@ -99,18 +99,18 @@ export default function CreateEventForm() {
       window.setTimeout(() => router.replace(`/events/${created.id}?created=1`), 650);
     } catch {
       setStatus("idle");
-      setSubmitError("We couldn’t create this Pact. Your details are still here—please try again.");
+      setSubmitError("We couldn’t create this event. Your details are still here. Try again.");
     }
   }
 
   if (status === "loading") return <main className="app-standalone"><AppTopbar compact /><div className="form-page-shell"><div className="form-skeleton" aria-label="Loading event form" /></div></main>;
 
-  if (status === "success") return <main className="app-standalone"><AppTopbar userName={user?.name} compact /><section className="creation-success" aria-live="polite"><span><Check aria-hidden="true" /></span><p className="app-eyebrow">Pact created</p><h1>{createdName}</h1><p>Your financial workspace is ready. Taking you to the overview…</p></section></main>;
+  if (status === "success") return <main className="app-standalone"><AppTopbar userName={user?.name} compact /><section className="creation-success" aria-live="polite"><span><Check aria-hidden="true" /></span><p className="app-eyebrow">Event created</p><h1>{createdName}</h1><p>Your financial workspace is ready. Taking you to the overview…</p></section></main>;
 
   return <main className="app-standalone">
     <AppTopbar userName={user?.name} compact />
     <div className="form-page-shell">
-      <div className="form-page-intro"><p className="app-eyebrow">New event workspace</p><h1>Create your Pact</h1><p>Start with the basics. You can add funding, payees, and payment schedules next.</p></div>
+      <div className="form-page-intro"><p className="app-eyebrow">New event workspace</p><h1>Set up your event</h1><p>Start with the basics. You can add funding, payees, and payment schedules next.</p></div>
       <form ref={formRef} className="create-event-form" onSubmit={submit} noValidate aria-busy={status === "submitting"}>
         <div className="form-field">
           <label htmlFor="name">Event name <span>Required</span></label>
@@ -140,7 +140,7 @@ export default function CreateEventForm() {
           </div>
         </div></fieldset>
         {submitError && <p className="form-submit-error" role="alert">{submitError}</p>}
-        <div className="form-submit-row"><p>Creating your Pact also creates its secure USDC event account.</p><button className="app-primary-button" type="submit" disabled={status === "submitting"}>{status === "submitting" ? <><LoaderCircle className="button-spinner" aria-hidden="true" /> Securing event account…</> : <>Create Pact <ArrowRight aria-hidden="true" /></>}</button></div>
+        <div className="form-submit-row"><p>Creating this event also creates its secure USDC account.</p><button className="app-primary-button" type="submit" disabled={status === "submitting"}>{status === "submitting" ? <><LoaderCircle className="button-spinner" aria-hidden="true" /> Securing event account…</> : <>Create event <ArrowRight aria-hidden="true" /></>}</button></div>
       </form>
     </div>
   </main>;
