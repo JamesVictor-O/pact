@@ -24,7 +24,6 @@ export default function Home() {
               <Link className="button button-primary" href="/auth?intent=organizer">Create an event Pact <ArrowRight aria-hidden="true" /></Link>
               <Link className="button button-secondary-on-dark" href="/auth?intent=payee">Review an agreement</Link>
             </div>
-            <p className="fine-print">Committed funding never counts as cash until it arrives.</p>
           </div>
           <div className="hero-progress" aria-hidden="true">
             <span>01</span><span className="progress-line"><i /></span><span>04</span>
