@@ -17,8 +17,9 @@ function passkeyRpId():string { return process.env.NEXT_PUBLIC_PACT_PASSKEY_RP_I
 export class PactAccountAdapter {
   async setup(user: { name: string; email: string }) {
     const created = await createPasskeyWithPrfOutput({ rp: { id: passkeyRpId(), name: "Pact" }, user: { name: user.email, displayName: user.name } });
-    localStorage.setItem(credentialKey(user.email.trim().toLowerCase()), JSON.stringify({ credentialId: created.credentialId, transports: created.transports }));
-    return this.withAccount(created.prfOutput, async (account) => ({ address: account.address }));
+    const credential={credentialId:created.credentialId,transports:created.transports} satisfies StoredCredential;
+    localStorage.setItem(credentialKey(user.email.trim().toLowerCase()), JSON.stringify(credential));
+    return this.withAccount(created.prfOutput, async (account) => ({ address: account.address,credential }));
   }
 
   async ensureAccount(user: { id:string;name:string;email:string }):Promise<{address:`0x${string}`}> {
@@ -28,19 +29,20 @@ export class PactAccountAdapter {
     if(token){
       const response=await fetch("/api/pact-account",{headers:{authorization:`Bearer ${token}`},cache:"no-store"});
       if(response.ok){
-        const {account}=await response.json() as {account:{signingAddress:`0x${string}`}|null};
-        if(account&&stored){const credential=JSON.parse(stored) as StoredCredential;const unlocked=await getPasskeyPrfOutput({rpId:passkeyRpId(),credential});const local=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));if(local.address.toLowerCase()!==account.signingAddress.toLowerCase())throw new Error("This device passkey does not match your Pact signing account.");return local;}
+        const {account}=await response.json() as {account:{signingAddress:`0x${string}`;credential?:StoredCredential}|null};
+        if(account&&stored){const credential=JSON.parse(stored) as StoredCredential;const local=await this.unlockCredential(credential,account.signingAddress);await this.bindAccount(local.address,credential);return local;}
         const legacy=localStorage.getItem(LEGACY_CREDENTIAL_KEY);
-        if(account&&legacy){const credential=JSON.parse(legacy) as StoredCredential;const unlocked=await getPasskeyPrfOutput({rpId:passkeyRpId(),credential});const local=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));if(local.address.toLowerCase()!==account.signingAddress.toLowerCase())throw new Error("This device passkey does not match your Pact signing account.");localStorage.setItem(key,legacy);return local;}
+        if(account&&legacy){const credential=JSON.parse(legacy) as StoredCredential;const local=await this.unlockCredential(credential,account.signingAddress);localStorage.setItem(key,legacy);await this.bindAccount(local.address,credential);return local;}
+        if(account?.credential){const local=await this.unlockCredential(account.credential,account.signingAddress);localStorage.setItem(key,JSON.stringify(account.credential));return local;}
         if(account)return this.recoverSyncedAccount(key,account.signingAddress);
       }
     }
     if(stored){
       const credential=JSON.parse(stored) as StoredCredential;
       const unlocked=await getPasskeyPrfOutput({rpId:passkeyRpId(),credential});
-      const account=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));await this.bindAccount(account.address);return account;
+      const account=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));await this.bindAccount(account.address,credential);return account;
     }
-    const account=await this.setup(user);await this.bindAccount(account.address);return account;
+    const account=await this.setup(user);await this.bindAccount(account.address,account.credential);return account;
   }
 
   private async recoverSyncedAccount(key:string,expectedAddress:`0x${string}`):Promise<{address:`0x${string}`}> {
@@ -48,12 +50,27 @@ export class PactAccountAdapter {
       const unlocked=await getPasskeyPrfOutput({rpId:passkeyRpId()});
       const account=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));
       if(account.address.toLowerCase()!==expectedAddress.toLowerCase())throw new Error("The selected passkey belongs to a different Pact signing account.");
-      localStorage.setItem(key,JSON.stringify({credentialId:unlocked.credentialId} satisfies StoredCredential));
+      const credential={credentialId:unlocked.credentialId} satisfies StoredCredential;
+      localStorage.setItem(key,JSON.stringify(credential));
+      await this.bindAccount(account.address,credential);
       return account;
     } catch(error) {
       if(error instanceof Error&&error.message==="The selected passkey belongs to a different Pact signing account.")throw error;
       if(isMeraError(error)&&error.code==="PRF_UNAVAILABLE")throw new Error("This passkey provider cannot unlock your Pact signing account. Use the provider that holds your original Pact passkey.");
-      throw new Error("Your Pact passkey is not available on this device. Use the same Apple, Google, or password-manager passkey account, or approve from a device that already has it.");
+      throw new Error("Your Pact passkey could not be opened here. Use the same Pact website address and passkey provider, or choose the browser option to use a passkey from another device.");
+    }
+  }
+
+  private async unlockCredential(credential:StoredCredential,expectedAddress:`0x${string}`):Promise<{address:`0x${string}`}> {
+    try {
+      const unlocked=await getPasskeyPrfOutput({rpId:passkeyRpId(),credential});
+      const account=await this.withAccount(unlocked.prfOutput,async value=>({address:value.address}));
+      if(account.address.toLowerCase()!==expectedAddress.toLowerCase())throw new Error("This device passkey does not match your Pact signing account.");
+      return account;
+    } catch(error) {
+      if(error instanceof Error&&error.message==="This device passkey does not match your Pact signing account.")throw error;
+      if(isMeraError(error)&&error.code==="PRF_UNAVAILABLE")throw new Error("This passkey provider cannot unlock your Pact signing account. Use the provider that holds your original Pact passkey.");
+      throw new Error("Your Pact passkey could not be opened here. Use the same Pact website address and passkey provider, or choose the browser option to use a passkey from another device.");
     }
   }
 
@@ -118,7 +135,7 @@ export class PactAccountAdapter {
     });
   }
 
-  private async bindAccount(address:`0x${string}`){const token=getAuthToken();if(!token)throw new Error("Your authenticated session is unavailable");const response=await fetch("/api/pact-account",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${token}`},body:JSON.stringify({address})});if(!response.ok){const body=await response.json().catch(()=>({})) as {error?:string};throw new Error(body.error??"Pact could not bind your Mera account");}}
+  private async bindAccount(address:`0x${string}`,credential?:StoredCredential){const token=getAuthToken();if(!token)throw new Error("Your authenticated session is unavailable");const response=await fetch("/api/pact-account",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${token}`},body:JSON.stringify({address,credential})});if(!response.ok){const body=await response.json().catch(()=>({})) as {error?:string};throw new Error(body.error??"Pact could not bind your Mera account");}}
 
   private async withAccount<T>(prfOutput: Uint8Array, action: (account: ReturnType<typeof toViemAccount>) => Promise<T>): Promise<T> {
     const session = createSecp256k1SigningSession({ privateKey: privateKeyFromPrf(prfOutput) });
