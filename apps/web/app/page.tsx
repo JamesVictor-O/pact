@@ -22,7 +22,7 @@ export default function Home() {
             <p className="hero-lede">Connect every funding source to every vendor milestone. Know what is funded, what is due, and where every dollar is going.</p>
             <div className="hero-actions">
               <Link className="button button-primary" href="/auth?intent=organizer">Start an event <ArrowRight aria-hidden="true" /></Link>
-              <Link className="button button-secondary-on-dark" href="/auth?intent=payee">Review an agreement</Link>
+              <Link className="button button-secondary-on-dark" href="/auth?intent=payee">Payee sign in</Link>
             </div>
           </div>
           <div className="hero-progress" aria-hidden="true">
