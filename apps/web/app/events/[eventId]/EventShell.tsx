@@ -69,9 +69,10 @@ export default function EventShell({ eventId, children }: { eventId: string; chi
       <div className="app-main-column">
         <header className="mobile-app-header"><Link className="app-wordmark" href="/dashboard"><Image src="/pact-primary-logo.svg" alt="Pact" width={96} height={29} /></Link><strong>{event.name}</strong></header>
         <nav className="mobile-app-nav" aria-label="Event navigation">{navItems.map((item) => {
+          const Icon = item.icon;
           const href = item.segment ? `${basePath}/${item.segment}` : basePath;
           const active = item.segment ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href;
-          return <Link key={item.label} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}>{item.label}</Link>;
+          return <Link key={item.label} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}><Icon aria-hidden="true" /><span>{item.label}</span></Link>;
         })}</nav>
         <main className="app-content">{children}</main>
       </div>
