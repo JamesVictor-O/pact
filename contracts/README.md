@@ -7,9 +7,11 @@ This directory is reserved for that validated settlement layer. Any custody, upg
 ## Monad mainnet deployment
 
 - Chain ID: `143`
-- `PactAgreementRegistry`: `0xc2B0D2A7e858F13b349843fF87dBF4EBF9227F49`
-- `PactEventVaultFactory`: `0xF7602C048F8C7Cc5E8c514522D633eb9A16a3a1B`
-- Settlement token (USDC): `0x754704Bc059F8C67012fEd69BC8A327a5aafb603`
+- [`PactAgreementRegistry`](https://monadscan.com/address/0xc2B0D2A7e858F13b349843fF87dBF4EBF9227F49): `0xc2B0D2A7e858F13b349843fF87dBF4EBF9227F49`
+- Current [`PactEventVaultFactory`](https://monadscan.com/address/0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31): `0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31`
+- Previous [`PactEventVaultFactory`](https://monadscan.com/address/0xF7602C048F8C7Cc5E8c514522D633eb9A16a3a1B): `0xF7602C048F8C7Cc5E8c514522D633eb9A16a3a1B`
+- Legacy [`PactTreasury`](https://monadscan.com/address/0x15B9E263B6E896d4D8F0D9c89878678aa6abAdeC): `0x15B9E263B6E896d4D8F0D9c89878678aa6abAdeC`
+- [Settlement token (USDC)](https://monadscan.com/address/0x754704Bc059F8C67012fEd69BC8A327a5aafb603): `0x754704Bc059F8C67012fEd69BC8A327a5aafb603`
 
 The factory deploys route-aware vaults: direct releases increment paid accounting, while Aurora releases enter `paymentRouting` and do not claim destination delivery.
 

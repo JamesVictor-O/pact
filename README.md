@@ -184,19 +184,33 @@ Pact treats retries, partial failure, and financial precision as core product re
 
 ## Mainnet deployment and verified behavior
 
-Pact currently targets Monad mainnet, chain ID `143`.
+Pact deploys its settlement contracts on Monad mainnet, chain ID `143`. Open any address below in [MonadScan](https://monadscan.com) to inspect its code and activity.
 
-| Component | Address |
-|---|---|
-| `PactAgreementRegistry` | `0xc2B0D2A7e858F13B349843fF87dBF4EBF9227F49` |
-| Route-resolution `PactEventVaultFactory` | `0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31` |
-| Pact route resolver | `0x2e5d8B56F9B4770a88794a47C32c177542d2f6ea` |
-| Canonical Monad USDC | `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` |
+### Pact contracts
+
+| Contract | Status and purpose | MonadScan |
+|---|---|---|
+| `PactAgreementRegistry` | Current registry for accepted agreement, schedule, and invoice hashes | [`0xc2B0D2A7e858F13B349843fF87dBF4EBF9227F49`](https://monadscan.com/address/0xc2B0D2A7e858F13B349843fF87dBF4EBF9227F49) |
+| `PactEventVaultFactory` | Current factory with direct release, Aurora routing, delivery resolution, and refund resolution | [`0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31`](https://monadscan.com/address/0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31) |
+| `PactEventVault` canary | Event-scoped USDC vault used for the verified inbound canaries below | [`0xa34C4648428Af097bdFA5d655f104b1742CA5e3A`](https://monadscan.com/address/0xa34C4648428Af097bdFA5d655f104b1742CA5e3A) |
+| `PactTreasury` | Legacy shared treasury retained for records created before event-scoped vaults | [`0x15B9E263B6E896d4D8F0D9c89878678aa6abAdeC`](https://monadscan.com/address/0x15B9E263B6E896d4D8F0D9c89878678aa6abAdeC) |
+| Previous `PactEventVaultFactory` | Superseded route-only factory retained for historical vaults | [`0xF7602C048F8C7Cc5E8c514522D633eb9A16a3a1B`](https://monadscan.com/address/0xF7602C048F8C7Cc5E8c514522D633eb9A16a3a1B) |
+
+Each event receives its own deterministic `PactEventVault`, so the application creates additional vault contracts as organizers create events. The canary vault above is a public example, while the current factory remains the canonical entry point for new deployments.
+
+### Connected mainnet addresses
+
+| Component | Role | MonadScan |
+|---|---|---|
+| Pact route resolver | Closes an organizer-authorized route as delivered or refunded; it cannot move funds or change route terms | [`0x2e5d8B56F9B4770a88794a47C32c177542d2f6ea`](https://monadscan.com/address/0x2e5d8B56F9B4770a88794a47C32c177542d2f6ea) |
+| Canonical Monad USDC | Settlement token held by each event vault | [`0x754704Bc059F8C67012fEd69BC8A327a5aafb603`](https://monadscan.com/address/0x754704Bc059F8C67012fEd69BC8A327a5aafb603) |
+
+The current route-resolution factory was deployed in [transaction `0x8ebed0…45be`](https://monadscan.com/tx/0x8ebed039d8290308c4568b09f1dcfa0f3c215966c69e568b801106b73e9545be).
 
 Verified mainnet inbound canaries include:
 
-- Arbitrum native ETH converted into `0.035305 USDC` in the correct Monad event vault: settlement transaction `0xb61cf6b91c273113f2370ea418b07f3643ea96c2e2a294dfe011c89f8bd6c6aa`
-- Stellar XLM converted into `0.212437 USDC` in the correct Monad event vault: settlement transaction `0x5dede1f53f3ad2ed6bf69a385102525149d5b12c37758b42871a421d5dc46712`
+- Arbitrum native ETH converted into `0.035305 USDC` in the correct Monad event vault: [settlement transaction `0xb61cf6…c6aa`](https://monadscan.com/tx/0xb61cf6b91c273113f2370ea418b07f3643ea96c2e2a294dfe011c89f8bd6c6aa)
+- Stellar XLM converted into `0.212437 USDC` in the correct Monad event vault: [settlement transaction `0x5dede1…712`](https://monadscan.com/tx/0x5dede1f53f3ad2ed6bf69a385102525149d5b12c37758b42871a421d5dc46712)
 - Repeated EVM and non-EVM syncs reconciled through the same chain-neutral receipt pipeline
 
 These tests exposed real integration failures that Pact then corrected: route-specific minimums, transaction hashes from the wrong chain, non-EVM transaction identity, reused persistent addresses, and settlement amounts smaller than one USD cent.
