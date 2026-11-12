@@ -1,6 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
+import HowItWorksCarousel from "./HowItWorksCarousel";
+import { HeroStage, HowSheet, RevealHeading } from "./HeroSheetTransition";
+import { DemoZoomTransition } from "./DemoZoomTransition";
 import PactDemo from "./PactDemo";
 import PeopleSection from "./PeopleSection";
 
@@ -16,6 +19,7 @@ export default function Home() {
       </header>
 
       <main id="top">
+        <HeroStage>
         <section className="hero" aria-labelledby="hero-heading">
           <div className="hero-copy">
             <h1 id="hero-heading">Built for the people who make events work.</h1>
@@ -29,36 +33,18 @@ export default function Home() {
             <span>01</span><span className="progress-line"><i /></span><span>04</span>
           </div>
         </section>
+        </HeroStage>
 
-
-
+        <HowSheet>
         <section id="how-it-works" className="process section-shell" aria-labelledby="process-heading">
-          <div className="section-intro"><p className="eyebrow">How Pact works</p><h2 id="process-heading">Turn your event budget into a live funding plan.</h2><p>Connect expected funding to real vendor milestones, then track each amount from commitment to payment.</p></div>
-          <div className="process-flow">
-            <article className="process-step process-side">
-              <div className="process-card-top"><span className="process-label">01 · Plan</span><span className="process-arrow"><ArrowUpRight aria-hidden="true" /></span></div>
-              <h3>Model where money comes from and where it must go.</h3>
-              <p>Add funding sources, vendor obligations, milestone amounts, and due dates without treating commitments as cash.</p>
-              <div className="process-image process-image-bottom"><Image src="/how-plan.png" alt="An event organizer and venue manager reviewing the event plan" fill sizes="(max-width: 960px) 100vw, 33vw" /></div>
-            </article>
-            <article className="process-step process-featured">
-              <div className="process-image process-image-shape"><Image src="/how-fund.png" alt="A sponsor and event producer reviewing a funding plan" fill sizes="(max-width: 960px) 100vw, 33vw" /></div>
-              <div className="process-featured-copy">
-                <div className="process-card-top"><span className="process-label">02 · Fund</span><span className="process-arrow"><ArrowUpRight aria-hidden="true" /></span></div>
-                <h3>Let sponsors fund the event, not the blockchain.</h3>
-                <p>Share a funding link for the event or a specific milestone. Pact handles the payment in the background.</p>
-              </div>
-            </article>
-            <article className="process-step process-side">
-              <div className="process-card-top"><span className="process-label">03 · Pay</span><span className="process-arrow"><ArrowUpRight aria-hidden="true" /></span></div>
-              <h3>Allocate received funds before you release payment.</h3>
-              <p>Fund each milestone, approve vendor payouts, and keep a clear record of payments and eligible refunds.</p>
-              <div className="process-image process-image-bottom"><Image src="/how-pay.png" alt="An event production vendor confirming a payment beside the stage" fill sizes="(max-width: 960px) 100vw, 33vw" /></div>
-            </article>
-          </div>
+          <div className="section-intro"><p className="eyebrow">How Pact works</p><RevealHeading id="process-heading" text="Turn your event budget into a live funding plan." /><p>Connect expected funding to real vendor milestones, then track each amount from commitment to payment.</p></div>
+          <HowItWorksCarousel />
         </section>
+        </HowSheet>
 
-        <PactDemo />
+        <DemoZoomTransition>
+          <PactDemo />
+        </DemoZoomTransition>
 
         <PeopleSection />
 
