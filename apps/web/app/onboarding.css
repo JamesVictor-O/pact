@@ -432,6 +432,11 @@
 .payment-readiness div > p:last-child, .payment-readiness ul { margin-top: 8px; color: var(--muted); font-size: 11px; }
 .payment-readiness ul { padding-left: 18px; display: grid; gap: 5px; }
 .payment-readiness .payment-available-note { color: var(--success); font-weight: 650; }
+.private-route-toggle { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-control); display: flex; gap: 10px; align-items: flex-start; cursor: pointer; max-width: 560px; }
+.private-route-toggle input { margin-top: 2px; accent-color: var(--ink); }
+.private-route-toggle span { display: grid; gap: 3px; }
+.private-route-toggle strong { font-size: 13px; color: var(--ink); }
+.private-route-toggle small { font-size: 11px; color: var(--muted); line-height: 1.45; }
 .payment-recovery-actions .payment-allocation-error { flex-basis: 100%; margin: 2px 0 0; text-align: right; }
 .payment-release-button { min-width: 190px; justify-content: center; }
 .payment-execution-state { margin-top: 16px; padding: 20px 24px; border: 1px solid var(--line); border-radius: 20px; display: flex; justify-content: space-between; align-items: center; gap: 24px; background: var(--surface); }

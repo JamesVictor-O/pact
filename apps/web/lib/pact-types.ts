@@ -116,6 +116,8 @@ export type AuroraDepositChain = "evm" | "btc" | "sol" | "tron" | "near" | "stel
 export type AuroraRouteStatus = "ready" | "deposit_received" | "processing" | "success" | "failed";
 export interface AuroraDepositRoute {
   id:string;fundingRequestId:string;eventId:string;depositChain:AuroraDepositChain;depositAddress:string;depositMemo?:string;
+  /** Created on NEAR Intents' confidential rail: the sender's wallet is not linkable to the event account. */
+  confidential?:boolean;
   destinationChain:string;destinationAsset:string;recipientAddress:string;status:AuroraRouteStatus;lastError?:string;lastSyncedAt?:string;createdAt:string;updatedAt:string;
 }
 
@@ -142,6 +144,8 @@ export type VaultExecutionChallenge = {
   destinationAssetSymbol?: string;
   expectedOutput?: string;
   minimumOutput?: string;
+  /** Route the payout over NEAR Intents' confidential rail. Only offered for NEAR destinations. */
+  private?: boolean;
 };
 
 export type VaultExecutionAuthorization = VaultExecutionChallenge & { signature: `0x${string}` };

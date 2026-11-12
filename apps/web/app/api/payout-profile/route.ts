@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAddress,isAddress,verifyMessage,type Address,type Hex} from "viem";
+import {nearAccountExists} from "../../../lib/near-delivery";
 import {isValidPayoutAddress,payoutChainFamily} from "../../../lib/payout-destinations";
 import {payoutPreferenceVerificationMessage} from "../../../lib/payout-verification";
 import {requireIdentity} from "../../../lib/server/auth";
@@ -21,6 +22,8 @@ export async function PATCH(request:NextRequest){
     if(!asset)return NextResponse.json({error:"This payout option is no longer available"},{status:400});
     let address=body.address.trim();
     if(!isValidPayoutAddress(asset.blockchain,address))return NextResponse.json({error:`Enter a valid ${asset.blockchain} receiving address`},{status:400});
+    // NEAR Intents rejects quotes to NEAR accounts that do not exist. Catch it here, not when the organizer pays.
+    if(payoutChainFamily(asset.blockchain)==="near"&&!await nearAccountExists(address,{rpcUrls:process.env.NEAR_RPC_URLS?.split(",").map(url=>url.trim()).filter(Boolean)}))return NextResponse.json({error:"This NEAR account doesn’t exist yet. Check the spelling, or fund the account first."},{status:400});
     let verification:"wallet_signature"|"payee_confirmation"="payee_confirmation";
     if(payoutChainFamily(asset.blockchain)==="evm"){
       if(!isAddress(address)||!body.message||!body.signature)return NextResponse.json({error:"Verify this wallet before saving it"},{status:400});

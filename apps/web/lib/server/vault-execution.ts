@@ -5,7 +5,9 @@ import { privateKeyToAccount } from "viem/accounts";
 import { canonicalBytes32, eventAllocationTypes, eventPaymentReleaseTypes, eventPaymentRouteTypes, eventVaultDomain } from "../agreement-typed-data";
 import type { Allocation, PaymentSettlement, VaultExecutionAuthorization, VaultExecutionChallenge } from "../pact-types";
 import { database, oneOrNull, transaction } from "./database";
-import { auroraPayoutAvailability, createAuroraPayoutQuote, getAuroraPayoutStatus, submitAuroraPayoutDeposit, type AuroraPayoutQuote } from "./aurora-payout";
+import { decideDestinationDelivery } from "./destination-delivery";
+import { payoutChainFamily } from "../payout-destinations";
+import { auroraPayoutAvailability, privateConfidentiality, createAuroraPayoutQuote, getAuroraPayoutStatus, submitAuroraPayoutDeposit, type AuroraPayoutQuote } from "./aurora-payout";
 
 const vaultAbi=parseAbi([
   "function organizerNonce() view returns(uint256)",
@@ -124,7 +126,7 @@ export async function relayAllocation(id:string,userId:string){
   }catch(error){const message=error instanceof Error?error.message:"Allocation failed";const failed=await oneOrNull<AllocationRow>(`update allocations set execution_status='failed',execution_error=$2,updated_at=now() where id=$1 returning *`,[id,message.slice(0,500)]);return allocationMap(failed!);}
 }
 
-export async function createPaymentChallenge(paymentId:string,userId:string){
+export async function createPaymentChallenge(paymentId:string,userId:string,options:{private?:boolean}={}){
   const c=requireBase(await context(paymentId,userId));
   if(c.invoice_status!=="confirmed")throw new Error("The payee invoice must be confirmed");
   if(c.payout_status!=="verified"||!c.payout_address)throw new Error("The payee payout destination must be verified");
@@ -133,19 +135,24 @@ export async function createPaymentChallenge(paymentId:string,userId:string){
   if(Number(c.payment_allocated_minor)<remaining)throw new Error("This payment must be fully funded before release");
   const nonce=await nonceFor(c.vault_address as Address),base=challengeFrom(c,remaining,nonce,c.payout_address);
   const routed=c.destination_chain?.toLowerCase()!=="monad"||c.destination_asset_id!=="monad:usdc";
-  if(!routed)return{...base,settlementMode:"direct" as const};
+  if(!routed){if(options.private)throw new Error("Private payouts are available when the payee is paid on NEAR");return{...base,settlementMode:"direct" as const};}
   await requireRouteResolutionVault(c.vault_address as Address);
   const available=auroraPayoutAvailability();if(!available.enabled)throw new Error(available.reason??"Cross-chain payouts are not available");
   if(!c.destination_asset_id||!c.destination_address||!c.destination_chain||!c.destination_asset_symbol)throw new Error("The payee payout preference is incomplete");
-  const existing=await oneOrNull<RouteRow>(`select * from payout_route_quotes where payment_id=$1 and status='quoted' and quote_deadline>now()+interval '60 seconds' and destination_asset_id=$2 and lower(recipient_address)=lower($3) and amount_in_atomic=$4 order by created_at desc limit 1`,[paymentId,c.destination_asset_id,c.destination_address,base.amountAtomic]);
+  // Private routes hide the link between the event vault and the payee. Pact only offers them where it can verify
+  // delivery without Aurora's (withheld) destination hash: NEAR, via public RPC.
+  if(options.private&&payoutChainFamily(c.destination_chain)!=="near")throw new Error("Private payouts are available when the payee is paid on NEAR");
+  const confidentiality=options.private?privateConfidentiality():"public";
+  const existing=await oneOrNull<RouteRow>(`select * from payout_route_quotes where payment_id=$1 and status='quoted' and quote_deadline>now()+interval '60 seconds' and destination_asset_id=$2 and lower(recipient_address)=lower($3) and amount_in_atomic=$4 and confidentiality=$5 order by created_at desc limit 1`,[paymentId,c.destination_asset_id,c.destination_address,base.amountAtomic,confidentiality]);
+  if(!existing)await database().query(`update payout_route_quotes set status='expired',updated_at=now() where payment_id=$1 and status='quoted'`,[paymentId]);
   let route=existing;
-  if(!route){const quote=await createAuroraPayoutQuote({amountAtomic:base.amountAtomic,vaultAddress:c.vault_address,destinationAsset:c.destination_asset_id,recipient:c.destination_address});const id=`route_${crypto.randomUUID()}`,q=quote.quote;route=await oneOrNull<RouteRow>(`insert into payout_route_quotes(id,event_id,agreement_id,payment_id,vault_address,deposit_address,refund_address,recipient_address,origin_asset_id,destination_chain,destination_asset_id,destination_asset_symbol,amount_in_atomic,amount_out_atomic,minimum_amount_out_atomic,amount_out_formatted,minimum_amount_out_formatted,quote_deadline,aurora_correlation_id,status,raw_quote) values($1,$2,$3,$4,$5,$6,$5,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'quoted',$19) returning *`,[id,c.event_id,c.agreement_id,c.payment_id,c.vault_address,q.depositAddress,c.destination_address,process.env.AURORA_PAYOUT_ORIGIN_ASSET_ID,c.destination_chain,c.destination_asset_id,c.destination_asset_symbol,q.amountIn,q.amountOut,q.minAmountOut,q.amountOutFormatted,q.minAmountOutFormatted??q.minimumAmountOutFormatted??q.minAmountOut,q.deadline,quote.correlationId??null,JSON.stringify(quote)]);}
+  if(!route){const quote=await createAuroraPayoutQuote({amountAtomic:base.amountAtomic,vaultAddress:c.vault_address,destinationAsset:c.destination_asset_id,recipient:c.destination_address,confidentiality});const id=`route_${crypto.randomUUID()}`,q=quote.quote;route=await oneOrNull<RouteRow>(`insert into payout_route_quotes(id,event_id,agreement_id,payment_id,vault_address,deposit_address,refund_address,recipient_address,origin_asset_id,destination_chain,destination_asset_id,destination_asset_symbol,amount_in_atomic,amount_out_atomic,minimum_amount_out_atomic,amount_out_formatted,minimum_amount_out_formatted,quote_deadline,aurora_correlation_id,status,raw_quote,confidentiality) values($1,$2,$3,$4,$5,$6,$5,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'quoted',$19,$20) returning *`,[id,c.event_id,c.agreement_id,c.payment_id,c.vault_address,q.depositAddress,c.destination_address,process.env.AURORA_PAYOUT_ORIGIN_ASSET_ID,c.destination_chain,c.destination_asset_id,c.destination_asset_symbol,q.amountIn,q.amountOut,q.minAmountOut,q.amountOutFormatted,q.minAmountOutFormatted??q.minimumAmountOutFormatted??q.minAmountOut,q.deadline,quote.correlationId??null,JSON.stringify(quote),confidentiality]);}
   if(!route||!isAddress(route.deposit_address))throw new Error("Aurora returned an invalid route deposit address");
-  return{...base,payoutAddress:route.deposit_address as Address,payoutRouteQuoteId:route.id,settlementMode:"aurora" as const,destinationChain:route.destination_chain,destinationAssetSymbol:route.destination_asset_symbol,expectedOutput:route.amount_out_formatted,minimumOutput:route.minimum_amount_out_formatted};
+  return{...base,payoutAddress:route.deposit_address as Address,payoutRouteQuoteId:route.id,settlementMode:"aurora" as const,destinationChain:route.destination_chain,destinationAssetSymbol:route.destination_asset_symbol,expectedOutput:route.amount_out_formatted,minimumOutput:route.minimum_amount_out_formatted,private:confidentiality!=="public"};
 }
 
 export async function executePayment(paymentId:string,userId:string,authorization:VaultExecutionAuthorization){
-  const expected=await createPaymentChallenge(paymentId,userId);
+  const expected=await createPaymentChallenge(paymentId,userId,{private:authorization.private===true});
   if(expected.vaultAddress.toLowerCase()!==authorization.vaultAddress.toLowerCase()||expected.organizer.toLowerCase()!==authorization.organizer.toLowerCase()||expected.agreementId!==authorization.agreementId||expected.paymentId!==authorization.paymentId||expected.amountAtomic!==authorization.amountAtomic||expected.nonce!==authorization.nonce||expected.payoutAddress?.toLowerCase()!==authorization.payoutAddress?.toLowerCase()||expected.settlementMode!==authorization.settlementMode||expected.payoutRouteQuoteId!==authorization.payoutRouteQuoteId)throw new Error("The payment authorization no longer matches current financial state");
   if(!await validAuthorization(authorization,"release"))throw new Error("The payment signature is invalid");
   const cfg=config(),id=`settlement_${crypto.randomUUID()}`;
@@ -180,11 +187,17 @@ export async function syncRoutedPayment(id:string,userId:string){
   if(!row)return null;
   if(row.settlement_mode!=="aurora"||!row.payout_route_quote_id)return settlementMap(row);
   if(["delivered","refunded"].includes(row.status))return settlementMap(row);
-  const remote=await getAuroraPayoutStatus(row.deposit_address),tx=remote.swapDetails?.destinationChainTxHashes?.[0];
+  const route=await oneOrNull<RouteRow&{created_at:Date;confidentiality:string}>(`select * from payout_route_quotes where id=$1`,[row.payout_route_quote_id]);
+  if(!route)throw new Error("The payout route is missing");
+  const remote=await getAuroraPayoutStatus(row.deposit_address);
   if(remote.status==="SUCCESS"){
-    if(!tx?.hash)throw new Error("Aurora reports success without destination transaction evidence");
+    // Aurora's SUCCESS is routing evidence, not finality. NEAR deliveries are re-checked on public NEAR RPC.
+    const decision=await decideDestinationDelivery(route,remote.swapDetails?.destinationChainTxHashes??[]);
+    if(!decision.delivered){await database().query(`update payout_route_quotes set last_error=$2,last_synced_at=now(),updated_at=now() where id=$1`,[route.id,decision.reason.slice(0,500)]);return{...settlementMap(row),failureMessage:decision.reason};}
+    // Claim the destination transaction before resolving the vault. The unique index lets one transaction settle only one payout.
+    await database().query(`update payout_route_quotes set destination_transaction_hash=$2,destination_explorer_url=$3,destination_verification=$4::jsonb,destination_verified_amount_atomic=$5,destination_verified_at=case when $4::jsonb is null then null else now() end,updated_at=now() where id=$1`,[route.id,decision.hash,decision.explorerUrl,decision.evidence?JSON.stringify(decision.evidence):null,decision.evidence?.amountAtomic??null]);
     await resolveVaultRoute(row.vault_address,row.payout_route_quote_id,"delivered");
-    const delivered=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='delivered',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 and status<>'delivered' returning *`,[id]);await db.query(`update payout_route_quotes set status='delivered',destination_transaction_hash=$2,destination_explorer_url=$3,last_error=null,last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id,tx.hash,tx.explorerUrl??null]);if(updated.rows[0]){await db.query(`update expense_payments set paid_amount_minor=least(amount_minor,paid_amount_minor+$2),processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id,row.amount_minor]);await db.query(`update invoices set status='paid',paid_at=coalesce(paid_at,now()),updated_at=now() where agreement_id=$1 and not exists(select 1 from expense_payments p join expenses x on x.id=p.expense_id where x.id=(select expense_id from payment_agreements where id=$1) and p.paid_amount_minor<p.amount_minor)`,[row.agreement_id]);}return updated.rows[0]??row;});return settlementMap(delivered);
+    const delivered=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='delivered',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 and status<>'delivered' returning *`,[id]);await db.query(`update payout_route_quotes set status='delivered',last_error=null,last_synced_at=now(),updated_at=now() where id=$1`,[row.payout_route_quote_id]);if(updated.rows[0]){await db.query(`update expense_payments set paid_amount_minor=least(amount_minor,paid_amount_minor+$2),processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id,row.amount_minor]);await db.query(`update invoices set status='paid',paid_at=coalesce(paid_at,now()),updated_at=now() where agreement_id=$1 and not exists(select 1 from expense_payments p join expenses x on x.id=p.expense_id where x.id=(select expense_id from payment_agreements where id=$1) and p.paid_amount_minor<p.amount_minor)`,[row.agreement_id]);}return updated.rows[0]??row;});return settlementMap(delivered);
   }
   if(remote.status==="REFUNDED"){
     await resolveVaultRoute(row.vault_address,row.payout_route_quote_id,"refunded");

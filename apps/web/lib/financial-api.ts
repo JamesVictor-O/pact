@@ -29,7 +29,7 @@ export const financialApi={
   allocate:async(sourceId:string,paymentId:string,amount:number,authorization:VaultExecutionAuthorization)=>(await request<{allocation:Allocation}>(`/api/funding/${sourceId}/allocations`,{method:"POST",body:JSON.stringify({paymentId,amount,authorization})})).allocation,
   retryAllocation:async(id:string)=>(await request<{allocation:Allocation}>(`/api/allocations/${id}/retry`,{method:"POST"})).allocation,
   reverseAllocation:async(id:string)=>(await request<{allocation:Allocation}>(`/api/allocations/${id}`,{method:"DELETE"})).allocation,
-  paymentChallenge:async(id:string)=>(await request<{challenge:VaultExecutionChallenge}>(`/api/payments/${id}/execution`,{method:"POST",body:"{}"})).challenge,
+  paymentChallenge:async(id:string,options:{private?:boolean}={})=>(await request<{challenge:VaultExecutionChallenge}>(`/api/payments/${id}/execution`,{method:"POST",body:JSON.stringify({private:options.private===true})})).challenge,
   executePayment:async(id:string,authorization:VaultExecutionAuthorization)=>(await request<{settlement:PaymentSettlement}>(`/api/payments/${id}/execution`,{method:"POST",body:JSON.stringify({authorization})})).settlement,
   paymentSettlements:async(id:string)=>(await request<{settlements:PaymentSettlement[]}>(`/api/payments/${id}/execution`)).settlements,
   retryPayment:async(paymentId:string,settlementId:string)=>(await request<{settlement:PaymentSettlement}>(`/api/payments/${paymentId}/execution/${settlementId}/retry`,{method:"POST"})).settlement,
