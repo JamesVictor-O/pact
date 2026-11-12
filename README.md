@@ -6,6 +6,8 @@ Pact connects event funding, payment agreements, allocation, and settlement in o
 
 Pact is a working hackathon project on Monad mainnet. It combines [Dynamic](#dynamic-verified-identity), [Mera](#mera-passkey-backed-authorization), [Monad](#monad-verifiable-agreements-and-event-vaults), and [Aurora Intents](#aurora-intents-cross-chain-entry-and-exit) behind a financial interface built for non-crypto users.
 
+> **NEAR HACKATHON:** the judged NEAR Intents work (NEAR-side delivery verification, Private payouts and contributions, NEAR canaries) is described in [NEAR_HACKATHON.md](NEAR_HACKATHON.md). Everything before the `pre-hackathon` tag is baseline from the Monad hackathon.
+
 ## The problem Pact solves
 
 Event finance is not one balance and one payment. Sponsors commit funds before transferring them. Venues, production teams, speakers, contractors, and other payees expect deposits and installments on different dates. Organizers reconcile those promises through spreadsheets, invoices, chats, screenshots, and bank accounts.
@@ -165,6 +167,7 @@ Implementation evidence:
 - [`008_cross_chain_payouts.sql`](packages/database/migrations/008_cross_chain_payouts.sql): payout route and settlement persistence
 - [`012_chain_neutral_aurora_reconciliation.sql`](packages/database/migrations/012_chain_neutral_aurora_reconciliation.sql): non-EVM reconciliation data model
 - [`014_payout_profile_revisions.sql`](packages/database/migrations/014_payout_profile_revisions.sql): versioned payee-selected payout preferences
+- [`015_near_delivery_and_private_routes.sql`](packages/database/migrations/015_near_delivery_and_private_routes.sql): NEAR delivery evidence, one-transaction-one-payout guard, Private routes
 
 The full integration journal, including failures and corrections, is in [`aurora.md`](aurora.md).
 

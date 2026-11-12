@@ -584,3 +584,13 @@ The relayer cannot choose the payee's destination or alter the route. The organi
 Aurora `SUCCESS` must include a destination-chain transaction hash before Pact marks the scheduled payment paid. `REFUNDED` restores the allocation only after the route resolver confirms the refunded state. A failure without a verified refund leaves the money locked in routing rather than making it available for a second payment.
 
 Migration `014_payout_profile_revisions.sql` adds an audit trail for preference changes. The local environment now enables outbound payouts, but production enablement still requires the same Aurora origin asset ID, Monad chain, settlement token, upgraded route-resolution vault, and a live delivery-and-refund canary. Contract/API implementation is complete; outbound production delivery must not be claimed until those canaries pass.
+
+## 22. NEAR HACKATHON: NEAR-side verification and Private routes, November 12, 2026
+
+- Catalog check: Aurora lists native NEAR USDC `nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` (6 decimals).
+- Correction: `syncRoutedPayment` previously required only that Aurora returned *a* destination hash. NEAR deliveries are now re-checked on public NEAR RPC for receiver, token contract, amount and finality before the vault route is resolved. See `lib/near-delivery.ts`.
+- Dry-run quotes accept `confidentiality: basic | advanced` for Monad USDC ↔ NEAR USDC, at about 0.22% extra cost. For confidential quotes the status API returns only `status`, so Private payouts are limited to NEAR destinations, where Pact can discover and verify delivery itself.
+- A quote to a non-existent NEAR account returns `Internal server error`. Payout settings now reject such accounts.
+- The October canary vault `0xa34C4648428Af097bdFA5d655f104b1742CA5e3A` is registered in route-resolution factory `0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31`.
+- Live canaries and evidence: `NEAR_HACKATHON.md`.
+

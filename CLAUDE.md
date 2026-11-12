@@ -1163,6 +1163,17 @@ The next agent should continue from **productionizing the Agreement lifecycle**,
 
 ---
 
+# 30a. NEAR HACKATHON work (after tag `pre-hackathon`)
+
+See `NEAR_HACKATHON.md` for scope, judged diff, and canary evidence.
+
+- NEAR payouts are marked delivered only after `lib/near-delivery.ts` verifies the NEAR transaction on public RPC (final, NEP-141 `ft_transfer` from `intents.near` by the exact token contract to the payee, amount ≥ quoted minimum). Aurora `SUCCESS` and its hash are hints, not finality.
+- One destination transaction settles at most one payout (unique index, claimed before vault resolution).
+- Private (NEAR Intents `confidentiality: basic`) payouts are only offered for NEAR destinations, because Aurora withholds destination hashes and Pact discovers and verifies delivery from the payee side. Ambiguous candidates fail closed.
+- Private contributions use separate `confidential: true` persistent addresses.
+- NEAR payout destinations must be existing accounts.
+- A refund cannot be forced through Pact on mainnet; the refund path is covered by Solidity tests only.
+
 # 31. One-Sentence Product Definition
 
 **Pact is the financial operating layer for events, connecting the money coming in, the agreements and payments going out, and the financial state in between.**
