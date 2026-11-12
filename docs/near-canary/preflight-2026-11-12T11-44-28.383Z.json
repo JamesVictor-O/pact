@@ -1,0 +1,125 @@
+{
+  "ranAt": "2026-11-12T11:44:28.383Z",
+  "nearAccount": "codexjames.near",
+  "vault": {
+    "factory": "0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31",
+    "eventId": "0xef76bd5555910f50fa41c037ec2fb93f676c4ef31ff4ee10eca00f7d6d2bc1b4",
+    "registered": "0x63181a7a3d4040d7FC41eC1D8A22a64CA1ff2194",
+    "resolver": "0x2e5d8B56F9B4770a88794a47C32c177542d2f6ea"
+  },
+  "amountAtomic": "1000000",
+  "catalog": {
+    "size": 230,
+    "nearUsdc": {
+      "assetId": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+      "decimals": 6,
+      "blockchain": "near",
+      "symbol": "USDC",
+      "price": 0.999488,
+      "priceUpdatedAt": "2026-11-12T11:43:30.941Z",
+      "contractAddress": "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"
+    },
+    "monadUsdc": {
+      "assetId": "nep245:v2_1.omni.hot.tg:143_2dmLwYWkCQKyTjeUPAsGJuiVLbFx",
+      "decimals": 6,
+      "blockchain": "monad",
+      "symbol": "USDC",
+      "price": 0.999488,
+      "priceUpdatedAt": "2026-11-12T11:43:30.941Z",
+      "contractAddress": "0x754704bc059f8c67012fed69bc8a327a5aafb603"
+    }
+  },
+  "nearAccountExists": true,
+  "dryQuotes": {
+    "outbound_public": {
+      "http": 200,
+      "correlationId": "bc564a50-2eba-4a65-8968-8682a09d29bb",
+      "timeEstimate": 20,
+      "amountIn": "1000000",
+      "amountInFormatted": "1.0",
+      "amountInUsd": "0.999488000000",
+      "minAmountIn": "1000000",
+      "amountOut": "995282",
+      "amountOutFormatted": "0.995282",
+      "amountOutUsd": "0.994772415616",
+      "minAmountOut": "985329",
+      "refundFee": "456",
+      "withdrawFee": "4315"
+    },
+    "outbound_basic": {
+      "http": 200,
+      "correlationId": "424da672-c8a6-423e-b463-eb151f3314fb",
+      "timeEstimate": 20,
+      "amountIn": "1000000",
+      "amountInFormatted": "1.0",
+      "amountInUsd": "0.999488000000",
+      "minAmountIn": "1000000",
+      "amountOut": "993084",
+      "amountOutFormatted": "0.993084",
+      "amountOutUsd": "0.992575540992",
+      "minAmountOut": "983153",
+      "refundFee": "456",
+      "withdrawFee": "4315"
+    },
+    "outbound_advanced": {
+      "http": 200,
+      "correlationId": "6f0bc500-0967-4fea-8f5e-09873b679f4d",
+      "timeEstimate": 20,
+      "amountIn": "1000000",
+      "amountInFormatted": "1.0",
+      "amountInUsd": "0.999488000000",
+      "minAmountIn": "1000000",
+      "amountOut": "993084",
+      "amountOutFormatted": "0.993084",
+      "amountOutUsd": "0.992575540992",
+      "minAmountOut": "983153",
+      "refundFee": "456",
+      "withdrawFee": "4315"
+    },
+    "inbound_public": {
+      "http": 200,
+      "correlationId": "4ff8d116-c52b-4b0c-8fee-7c2997bf8ed2",
+      "timeEstimate": 22,
+      "amountIn": "1000000",
+      "amountInFormatted": "1.0",
+      "amountInUsd": "0.999488000000",
+      "minAmountIn": "1000000",
+      "amountOut": "999141",
+      "amountOutFormatted": "0.999141",
+      "amountOutUsd": "0.998629439808",
+      "minAmountOut": "989149",
+      "refundFee": "4315",
+      "withdrawFee": "456"
+    },
+    "inbound_basic": {
+      "http": 200,
+      "correlationId": "f8981652-9a6d-488d-9f7a-51cce0bcb785",
+      "timeEstimate": 22,
+      "amountIn": "1000000",
+      "amountInFormatted": "1.0",
+      "amountInUsd": "0.999488000000",
+      "minAmountIn": "1000000",
+      "amountOut": "996941",
+      "amountOutFormatted": "0.996941",
+      "amountOutUsd": "0.996430566208",
+      "minAmountOut": "986971",
+      "refundFee": "4315",
+      "withdrawFee": "456"
+    },
+    "inbound_advanced": {
+      "http": 200,
+      "correlationId": "b18264b9-c109-4a23-adfe-e96c164d48b4",
+      "timeEstimate": 22,
+      "amountIn": "1000000",
+      "amountInFormatted": "1.0",
+      "amountInUsd": "0.999488000000",
+      "minAmountIn": "1000000",
+      "amountOut": "996941",
+      "amountOutFormatted": "0.996941",
+      "amountOutUsd": "0.996430566208",
+      "minAmountOut": "986971",
+      "refundFee": "4315",
+      "withdrawFee": "456"
+    }
+  }
+}
