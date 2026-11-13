@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { authClient, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
 import { destinationForAuthIntent } from "../../lib/auth-routing";
 import { usePactAuth } from "../components/PactAuthProvider";
+import { AuthMorph, fromAuthTypes } from "../AuthMorph";
 
 export default function AuthEntry({ intent }: { intent: "organizer" | "payee" }) {
   const router = useRouter();
@@ -105,11 +106,13 @@ export default function AuthEntry({ intent }: { intent: "organizer" | "payee" })
   }
 
   return <main className="auth-page">
+    <AuthMorph part="stage">
     <section className="auth-brand-panel" aria-label="About Pact">
-      <Link href="/" className="auth-back"><ArrowLeft aria-hidden="true" /> Back to Pact</Link>
-      <div><Image className="auth-logo" src="/pact-primary-logo.svg" alt="Pact" width={132} height={40} priority /><h1>Start with the event. See every dollar clearly.</h1><p>Create the financial workspace your team, sponsors, and payees can trust.</p></div>
+      <Link href="/" className="auth-back" transitionTypes={fromAuthTypes}><ArrowLeft aria-hidden="true" /> Back to Pact</Link>
+      <div><AuthMorph part="logo"><Image className="auth-logo" src="/pact-primary-logo.svg" alt="Pact" width={132} height={40} priority /></AuthMorph><AuthMorph part="headline"><h1>Start with the event. See every dollar clearly.</h1></AuthMorph><AuthMorph part="lede"><p>Create the financial workspace your team, sponsors, and payees can trust.</p></AuthMorph></div>
       <p className="auth-brand-note">Committed funding never counts as cash until it arrives.</p>
     </section>
+    </AuthMorph>
     <section className="auth-form-panel" aria-labelledby="auth-heading">
       <div className="auth-form-wrap">
         <p className="app-eyebrow">{intent === "payee" ? "Vendor access" : "Organizer access"}</p>
@@ -133,7 +136,7 @@ export default function AuthEntry({ intent }: { intent: "organizer" | "payee" })
             <div className="input-with-icon"><Mail aria-hidden="true" /><input ref={emailRef} id="email" name="email" type="email" autoComplete="email" spellCheck={false} placeholder="you@company.com" value={email} onChange={(event) => setEmail(event.target.value)} onBlur={() => email && setEmailError(/^\S+@\S+\.\S+$/.test(email.trim()) ? "" : "Enter a valid email address.")} aria-invalid={emailError ? "true" : undefined} aria-describedby={emailError ? "email-error" : undefined} /></div>
             {emailError && <p className="field-error" id="email-error">{emailError}</p>}
           </div>
-          <button className="app-primary-button" type="submit" disabled={Boolean(pending) || !configured || !ready} aria-busy={pending === "email"}>{pending === "email" ? "Sending code…" : "Continue with email"}<ArrowRight aria-hidden="true" /></button>
+          <AuthMorph part="cta"><button className="app-primary-button" type="submit" disabled={Boolean(pending) || !configured || !ready} aria-busy={pending === "email"}>{pending === "email" ? "Sending code…" : "Continue with email"}<ArrowRight aria-hidden="true" /></button></AuthMorph>
         </form> : <form onSubmit={confirmEmailCode} noValidate>
           <div className="form-field">
             <label htmlFor="code">Verification code</label>

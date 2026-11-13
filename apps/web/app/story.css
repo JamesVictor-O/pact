@@ -91,6 +91,40 @@ h1 { max-width: 650px; font-size: clamp(48px, 5.5vw, 78px); line-height: 1.02; l
 
 /* How Pact works: center-focus carousel. Geometry is expressed in % of the slide width so the
    single track can translate with transforms only (no layout work during animation). */
+/* Landing hero <-> sign-in page (React <ViewTransition>, see AuthMorph.tsx). The hero narrows
+   from the right into the dark brand panel, its copy glides into the panel copy, the logo and the
+   primary button morph into their counterparts, and the form slides in as the curtain clears. */
+::view-transition-group(.pact-morph-stage), ::view-transition-group(.pact-morph-logo), ::view-transition-group(.pact-morph-text), ::view-transition-group(.pact-morph-cta) { animation-duration: 720ms; animation-timing-function: cubic-bezier(.22,1,.36,1); }
+/* Natural size, anchored top-left: snapshots are only cropped, never scaled, so it reads as a curtain in both directions. */
+::view-transition-old(.pact-morph-stage), ::view-transition-new(.pact-morph-stage) { height: 100%; object-fit: none; object-position: left top; overflow: clip; }
+/* The photo stays opaque while the curtain closes, then settles into the flat ink panel. */
+::view-transition-old(.pact-morph-stage) { animation: 300ms ease-in 300ms both pact-fade-out; }
+::view-transition-new(.pact-morph-stage) { animation: 320ms ease-out 260ms both pact-fade-in; }
+/* Going back, the hero is the larger image: show it at once so the widening crop opens it like a curtain. */
+html:active-view-transition-type(from-auth)::view-transition-old(.pact-morph-stage) { animation: 260ms ease-out both pact-fade-out; }
+html:active-view-transition-type(from-auth)::view-transition-new(.pact-morph-stage) { animation: 160ms ease-out both pact-fade-in; }
+/* Text: let the old words leave before the new ones resolve, so two sentences never overlap. */
+::view-transition-old(.pact-morph-text) { height: 100%; object-fit: none; object-position: left top; animation: 220ms ease-out both pact-fade-out; }
+::view-transition-new(.pact-morph-text) { height: 100%; object-fit: none; object-position: left top; animation: 420ms cubic-bezier(.22,1,.36,1) 300ms both pact-fade-in; }
+/* Button: the pill morphs; labels keep their natural size and swap mid-flight. */
+::view-transition-old(.pact-morph-cta), ::view-transition-new(.pact-morph-cta) { height: 100%; object-fit: none; object-position: center; overflow: clip; }
+::view-transition-old(.pact-morph-cta) { animation: 160ms ease-out both pact-fade-out; }
+::view-transition-new(.pact-morph-cta) { animation: 320ms cubic-bezier(.22,1,.36,1) 260ms both pact-fade-in; }
+/* The form is captured on its own (only during these navigations) so it can wait for the curtain
+   to clear and slide in, and slide back out when returning to the landing page. */
+html:active-view-transition-type(to-auth) .auth-form-panel, html:active-view-transition-type(from-auth) .auth-form-panel { view-transition-name: pact-auth-form; }
+html:active-view-transition-type(to-auth)::view-transition-new(pact-auth-form) { animation: 520ms cubic-bezier(.22,1,.36,1) 300ms both pact-slide-from-right; }
+html:active-view-transition-type(from-auth)::view-transition-old(pact-auth-form) { animation: 240ms ease-in both pact-slide-to-right; }
+html:active-view-transition-type(to-auth)::view-transition-old(root) { animation: 300ms ease-out both pact-fade-out; }
+html:active-view-transition-type(from-auth)::view-transition-old(root) { animation: 300ms ease-out both pact-fade-out; }
+@keyframes pact-fade-in { from { opacity: 0; } }
+@keyframes pact-fade-out { to { opacity: 0; } }
+@keyframes pact-slide-from-right { from { opacity: 0; transform: translateX(48px); } }
+@keyframes pact-slide-to-right { to { opacity: 0; transform: translateX(48px); } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
 /* Hero -> "How Pact works": the sheet slides up over a pinned hero. Default (reduced motion) is a
    plain stack with the rounded top edge; the scroll-linked version adds the runway and pinning. */
 .hero-stage, .how-sheet { --hero-runway: 60svh; }
