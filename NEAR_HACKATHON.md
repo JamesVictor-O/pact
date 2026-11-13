@@ -103,12 +103,25 @@ node --env-file=.env.local --experimental-strip-types scripts/near/observer.ts -
 
 Then screenshot Monadscan and [explorer.near-intents.org](https://explorer.near-intents.org) for each run.
 
+**Canary 3 result (Private, `confidentiality: "basic"`):**
+
+| Evidence | Value |
+|---|---|
+| Monad `routePayment` tx | [`0x9487a176…2e7c22`](https://monadscan.com/tx/0x9487a17634cfddb7d79526066ce1993c42e8223f2a4e420b47ba92e7eb2e7c22): 0.20 USDC to confidential deposit address `0xA35270f087072634ae3380177c8E725a9cBCBf6D` |
+| Aurora deposit report | Failed upstream (`Empty AMQP response`); NEAR Intents still detected the deposit. Pact now treats the report as best-effort |
+| Aurora status | `{"status":"SUCCESS"}` only: no hashes, recipient or amounts |
+| NEAR delivery (found via FastNEAR, verified on RPC) | [`B86feaGRWcft8iHq6m5Xs52xDQhYCunTKPB4HTUJDJKG`](https://nearblocks.io/txns/B86feaGRWcft8iHq6m5Xs52xDQhYCunTKPB4HTUJDJKG): 0.199477 USDC to `codexjames.near`, minimum 0.197482 |
+| Vault `routeStatus` | **2 = Delivered**; Pact verified at 01:20:26 UTC |
+
+On NearBlocks the public and Private deliveries look the same (both `intents.near` → `codexjames.near`, each from a different NEAR Intents internal account). The difference is in what links them back to the event vault.
+
 | What an outside observer sees | Public route | Private route |
 |---|---|---|
-| Monadscan: event vault → deposit address, amount | _pending_ | _pending_ |
-| NEAR Intents explorer: record for the deposit address | _pending_ | _pending_ |
+| Monadscan: event vault → deposit address, amount | Visible: 0.2 USDC to `0x1aF8…FaCE` | Visible: 0.2 USDC to `0xA352…BF6D` |
+| Aurora / 1Click status for the deposit address | Origin tx, destination tx, amounts | `{"status":"SUCCESS"}` only |
+| NEAR Intents explorer: record for the deposit address | _pending (screenshot)_ | _pending (screenshot)_ |
 | NEAR Intents explorer: shows the NEAR recipient? | _pending_ | _pending_ |
-| NearBlocks: `intents.near` → payee USDC transfer | _pending_ | _pending_ |
+| NearBlocks: `intents.near` → payee USDC transfer | Visible (`GUyJ…`) | Visible (`B86fea…`) |
 | Can the event vault be linked to the payee? | _pending_ | _pending_ |
 
 Expected, per the [Aurora Confidential Intents docs](https://docs.intents.aurora.dev/confidential-intents.md): the confidential rail hides the origin wallet, the routing path, and the link between source and destination. The destination transfer itself stays public. The canary checks whether that holds for a Monad vault payout.
