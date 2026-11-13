@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { RevealHeading } from "./HeroSheetTransition";
 import {
   ArrowRight,
   Check,
@@ -152,7 +153,7 @@ export default function PactDemo() {
   return <section ref={sectionRef} id="funding-demo" className="demo-section" aria-labelledby="demo-heading">
     <div className="section-shell demo-shell">
       <div className="demo-intro">
-        <div><h2 id="demo-heading">Follow the money from plan to payment.</h2></div>
+        <div><RevealHeading id="demo-heading" text="Follow the money from plan to payment." /></div>
         <p>One shared flow keeps organizers, sponsors, and vendors aligned on what was promised, what arrived, and what can be paid.</p>
       </div>
 

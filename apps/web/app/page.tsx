@@ -4,7 +4,9 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import HowItWorksCarousel from "./HowItWorksCarousel";
 import { HeroStage, HowSheet, RevealHeading } from "./HeroSheetTransition";
 import { DemoZoomTransition } from "./DemoZoomTransition";
-import { AuthMorph, heroCtaTypes, toAuthTypes } from "./AuthMorph";
+import { PeopleTransition } from "./PeopleTransition";
+import { AuthMorph } from "./AuthMorph";
+import { GetStarted, HeaderActions } from "./GetStarted";
 import PactDemo from "./PactDemo";
 import PeopleSection from "./PeopleSection";
 
@@ -16,7 +18,7 @@ export default function Home() {
         <nav aria-label="Main navigation">
           <a href="#how-it-works">How it works</a><a href="#for-everyone">For everyone</a><a href="#funding-demo">Try the demo</a>
         </nav>
-        <div className="site-header-actions"><Link className="header-sign-in" href="/auth?intent=payee" transitionTypes={toAuthTypes}>Vendor sign in</Link><Link className="button button-primary button-small" href="/auth?intent=organizer" transitionTypes={toAuthTypes}>Start an event <ArrowRight aria-hidden="true" /></Link></div>
+        <HeaderActions />
       </header>
 
       <main id="top">
@@ -27,8 +29,7 @@ export default function Home() {
             <AuthMorph part="headline"><h1 id="hero-heading">Built for the people who make events work.</h1></AuthMorph>
             <AuthMorph part="lede"><p className="hero-lede">Connect every funding source to every vendor milestone. Know what is funded, what is due, and where every dollar is going.</p></AuthMorph>
             <div className="hero-actions">
-              <AuthMorph part="cta"><Link className="button button-primary" href="/auth?intent=organizer" transitionTypes={heroCtaTypes}>Start an event <ArrowRight aria-hidden="true" /></Link></AuthMorph>
-              <Link className="button button-secondary-on-dark" href="/auth?intent=payee" transitionTypes={toAuthTypes}>Payee sign in</Link>
+              <GetStarted />
             </div>
           </div>
           <div className="hero-progress" aria-hidden="true">
@@ -49,7 +50,9 @@ export default function Home() {
           <PactDemo />
         </DemoZoomTransition>
 
-        <PeopleSection />
+        <PeopleTransition>
+          <PeopleSection />
+        </PeopleTransition>
 
         <section className="closing section-shell" aria-labelledby="closing-heading"><div><p className="eyebrow">See the financial state</p><h2 id="closing-heading">Find the funding gap before it becomes a crisis.</h2><p>Track every commitment, milestone, allocation, payment, and eligible refund in one place.</p></div><div className="closing-actions"><Link className="text-link" href="/auth?intent=payee">Vendor sign in <ArrowUpRight aria-hidden="true" /></Link><Link className="button button-primary" href="/auth?intent=organizer">Start an event <ArrowUpRight aria-hidden="true" /></Link></div></section>
       </main>

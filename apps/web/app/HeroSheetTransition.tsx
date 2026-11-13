@@ -88,7 +88,7 @@ export function RevealHeading({ id, text }: { id: string; text: string }) {
         if (mask.offsetTop > lastTop + 2) { line += 1; lastTop = mask.offsetTop; }
         mask.style.setProperty("--line", String(line));
       }
-      heading.closest<HTMLElement>(".how-sheet")?.style.setProperty("--heading-lines", String(line + 1));
+      heading.closest<HTMLElement>("[data-reveal]")?.style.setProperty("--heading-lines", String(line + 1));
     };
     assignLines();
     const observer = new ResizeObserver(assignLines);

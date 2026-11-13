@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient, isAuthPreviewEnabled, isDynamicAuthConfigured } from "../../lib/pact-storage";
-import { destinationForAuthIntent } from "../../lib/auth-routing";
+import { destinationForAuthIntent, rememberAuthIntent } from "../../lib/auth-routing";
 import { usePactAuth } from "../components/PactAuthProvider";
 import { AuthMorph, fromAuthTypes } from "../AuthMorph";
 
@@ -29,6 +29,7 @@ export default function AuthEntry({ intent }: { intent: "organizer" | "payee" })
 
   async function finishAuthentication(_user: Awaited<ReturnType<typeof authClient.signInWithEmail>>) {
     const destination = destinationForAuthIntent(intent);
+    rememberAuthIntent(intent);
     if (isDynamicAuthConfigured) router.replace(destination);
     else window.location.assign(destination);
   }
