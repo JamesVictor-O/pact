@@ -17,7 +17,8 @@ Event money sits in several states at once, and spreadsheets blur them. A sponso
 |---|---|
 | **Track** | Real-World Money (primary). Privacy (secondary): confidential NEAR Intents routes for payroll and contributions |
 | **Pre-existing product** | Yes. Everything up to tag [`pre-hackathon`](https://github.com/JamesVictor-O/pact/releases/tag/pre-hackathon) (commit `db2420e`, 2026-10-13) is baseline and not judged (Q-002, Q-004) |
-| **Judged work** | The NEAR Intents integration built 2026-10-19 → 2026-11-14, listed below |
+| **Judged work** | The NEAR Intents integration listed below. Every commit after `pre-hackathon` is dated 2026-11-12 or later, inside the hackathon window. The diff also contains landing-page UI work (carousel and page transitions); it is not NEAR integration and is not claimed as such |
+| **Hosted demo** | [pactt.vercel.app](https://pactt.vercel.app): the same code as this repository, auto-deployed from `main`, on Monad mainnet |
 | **Judged diff** | [`pre-hackathon...hackathon-submission`](https://github.com/JamesVictor-O/pact/compare/pre-hackathon...hackathon-submission) |
 | **Mainnet evidence** | [Mainnet evidence](#mainnet-evidence): every claim links to a transaction on Monadscan, Basescan or NearBlocks |
 | **Full canary log** | [NEAR_HACKATHON.md](NEAR_HACKATHON.md) |
@@ -72,7 +73,17 @@ Change the recipient to any other account and run it again. **Expected:** `"veri
 
 Every row in [Mainnet evidence](#mainnet-evidence) links to a public explorer. You can check, for example, that the Monad vault transfer and the NEAR delivery have the amounts stated.
 
-### 3. With keys: the full application
+### 3. In the hosted app
+
+Open [pactt.vercel.app](https://pactt.vercel.app):
+1. Sign in with Google or email.
+2. Create an event. This deploys its vault on Monad mainnet; see the event's **Funding** page for its receiving address.
+3. Open a funding link and choose a sending network. With *Private contribution* ticked you get a separate confidential deposit address.
+4. As a payee, set the payout destination to **USDC on NEAR**. Entering an account that doesn't exist is refused.
+
+Moving real money is optional. The mainnet evidence above already covers it.
+
+### 4. With keys: the full application locally
 
 See [Run Pact locally](#run-pact-locally). With an Aurora Intents API key, `scripts/near/preflight.ts` reproduces the catalog, account and `dry: true` quote checks without moving funds.
 
@@ -282,7 +293,7 @@ Aurora's API is how Pact reaches NEAR Intents (its 1Click-compatible endpoints: 
 - **Private payout discovery depends on a third-party index** (FastNEAR, with NearBlocks as fallback) to list candidate transfers, because the confidential API withholds the hash. Verification itself uses NEAR RPC. If both indexes are down, or discovery finds more than one match, Pact does not mark the payment paid.
 - **Confidentiality covers the routing link, not the endpoints.** We measured this on mainnet: the vault's transfer on Monad and the final `ft_transfer` on NEAR are public in both modes. What the confidential route withholds is the record connecting them (see section 4 above).
 - **NEAR Intents is reached through Aurora's API, not 1Click directly.** Settlement happens on `intents.near` either way, as the NearBlocks evidence shows.
-- **No hosted demo.** The app runs locally, and every claim above is verifiable from the repository and public explorers.
+- **The hosted demo uses mainnet.** Creating an event on [pactt.vercel.app](https://pactt.vercel.app) deploys a real event vault on Monad (the relayer pays the gas), and payouts move real USDC. The canary event shown in the screenshots was run in a local environment against the same mainnet contracts.
 - **No AI agents.** Pact does not use AI agents, so it is not entered in agent-based tracks.
 
 ---
@@ -358,4 +369,4 @@ Never put relayer or deployer keys in `NEXT_PUBLIC_*` variables. `.env.local` is
 - **Infrastructure:** NEAR Intents (through Aurora's Intents API), NEAR mainnet public RPC (FastNEAR, near.org), NearBlocks API (Private-payout discovery only), Monad mainnet, Base (sponsor source in the canary).
 - **Application:** Next.js 16, React 19, viem, framer-motion, lucide-react, pg, jose, three, `@dynamic-labs/sdk-react-core`, `@category-labs/mera`, `@fontsource/inter`.
 - **Contracts:** Solidity with OpenZeppelin Contracts (ECDSA, EIP712, SafeERC20, ReentrancyGuard), Foundry and forge-std.
-- AI coding assistants were used during development.
+- **AI-generated code (Q-005):** much of the hackathon code, tests and documentation was written with an AI coding assistant (Claude Code) and reviewed by the team. All of it is verified by the test suite and the mainnet canaries above.
