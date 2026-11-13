@@ -226,26 +226,61 @@ type NearBlocksFtTxn = {
  * destination hashes (confidential routes). Candidates are newest first and
  * must still pass `verifyNearDeliveryOnChain`.
  */
-export async function findNearDeliveryCandidates(input: { recipient: string; tokenContract: string; since: Date; senders?: string[] }, options: { fetcher?: typeof fetch; baseUrl?: string } = {}) {
+export const DEFAULT_FASTNEAR_TX_API_URL = "https://tx.main.fastnear.com";
+
+type FastNearAccountTx = { transaction_hash: string; tx_block_timestamp: string; is_signer?: boolean };
+
+/**
+ * Candidate NEAR transactions that may have delivered a Private payout (the confidential route withholds
+ * the destination hash). Candidates are only hints: callers must verify each one on NEAR RPC.
+ * Sources: FastNEAR's account-transaction index (lists NEAR Intents withdrawals) and NearBlocks'
+ * FT index as a fallback. Either source failing is tolerated; both failing is an error.
+ */
+export async function findNearDeliveryCandidates(input: { recipient: string; tokenContract: string; since: Date; senders?: string[] }, options: { fetcher?: typeof fetch; baseUrl?: string; fastNearUrl?: string } = {}) {
   const fetcher = options.fetcher ?? fetch;
-  const base = (options.baseUrl ?? process.env.NEARBLOCKS_API_URL ?? DEFAULT_NEARBLOCKS_API_URL).replace(/\/$/, "");
-  const senders = new Set((input.senders ?? [NEAR_INTENTS_ACCOUNT]).map(sender => sender.toLowerCase()));
-  const response = await fetcher(`${base}/v1/account/${encodeURIComponent(input.recipient)}/ft-txns?per_page=50&order=desc`, {
-    headers: process.env.NEARBLOCKS_API_KEY ? { authorization: `Bearer ${process.env.NEARBLOCKS_API_KEY}` } : undefined,
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error(`NEAR indexer returned HTTP ${response.status}`);
-  const body = await response.json() as { txns?: NearBlocksFtTxn[] };
   const sinceNs = BigInt(input.since.getTime()) * BigInt(1_000_000);
-  const token = input.tokenContract.toLowerCase();
   const hashes = new Set<string>();
-  for (const item of body.txns ?? []) {
-    if (item.ft?.contract?.toLowerCase() !== token) continue;
-    if (item.affected_account_id.toLowerCase() !== input.recipient.toLowerCase()) continue;
-    if (item.delta_amount.startsWith("-")) continue;
-    if (item.involved_account_id && !senders.has(item.involved_account_id.toLowerCase())) continue;
-    if (BigInt(item.block_timestamp) < sinceNs) continue;
-    if (isNearTransactionHash(item.transaction_hash)) hashes.add(item.transaction_hash);
-  }
+  let succeeded = 0;
+  const errors: string[] = [];
+
+  // 1. FastNEAR: every transaction touching the account; the payee did not sign the delivery.
+  try {
+    const base = (options.fastNearUrl ?? process.env.FASTNEAR_TX_API_URL ?? DEFAULT_FASTNEAR_TX_API_URL).replace(/\/$/, "");
+    const response = await fetcher(`${base}/v0/account`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ account_id: input.recipient }), signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) throw new Error(`FastNEAR returned HTTP ${response.status}`);
+    const body = await response.json() as { account_txs?: FastNearAccountTx[] };
+    if (Array.isArray(body.account_txs)) {
+      succeeded += 1;
+      for (const tx of body.account_txs) {
+        if (tx.is_signer) continue;
+        if (BigInt(tx.tx_block_timestamp) < sinceNs) continue;
+        if (isNearTransactionHash(tx.transaction_hash)) hashes.add(tx.transaction_hash);
+      }
+    }
+  } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+
+  // 2. NearBlocks FT index (does not always list NEAR Intents withdrawals, so it is a fallback).
+  try {
+    const base = (options.baseUrl ?? process.env.NEARBLOCKS_API_URL ?? DEFAULT_NEARBLOCKS_API_URL).replace(/\/$/, "");
+    const senders = new Set((input.senders ?? [NEAR_INTENTS_ACCOUNT]).map(sender => sender.toLowerCase()));
+    const response = await fetcher(`${base}/v1/account/${encodeURIComponent(input.recipient)}/ft-txns?per_page=50&order=desc`, {
+      headers: process.env.NEARBLOCKS_API_KEY ? { authorization: `Bearer ${process.env.NEARBLOCKS_API_KEY}` } : undefined,
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw new Error(`NEAR indexer returned HTTP ${response.status}`);
+    const body = await response.json() as { txns?: NearBlocksFtTxn[] };
+    if (Array.isArray(body.txns)) succeeded += 1;
+    const token = input.tokenContract.toLowerCase();
+    for (const item of body.txns ?? []) {
+      if (item.ft?.contract?.toLowerCase() !== token) continue;
+      if (item.affected_account_id.toLowerCase() !== input.recipient.toLowerCase()) continue;
+      if (item.delta_amount.startsWith("-")) continue;
+      if (item.involved_account_id && !senders.has(item.involved_account_id.toLowerCase())) continue;
+      if (BigInt(item.block_timestamp) < sinceNs) continue;
+      if (isNearTransactionHash(item.transaction_hash)) hashes.add(item.transaction_hash);
+    }
+  } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+
+  if (succeeded === 0) throw new Error(`NEAR indexers unavailable: ${errors.join("; ")}`);
   return [...hashes];
 }

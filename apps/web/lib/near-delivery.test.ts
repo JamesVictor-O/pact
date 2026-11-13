@@ -83,3 +83,27 @@ test("discovers only incoming USDC from NEAR Intents after the route started", a
   ] }))) as typeof fetch;
   assert.deepEqual(await findNearDeliveryCandidates({ recipient: "payee.near", tokenContract: USDC, since }, { fetcher }), [good]);
 });
+
+test("discovers Private-payout candidates from FastNEAR when the FT index is empty", async () => {
+  const since = new Date("2026-11-13T00:31:00Z");
+  const ns = (iso: string) => (BigInt(new Date(iso).getTime()) * BigInt(1_000_000)).toString();
+  const fetcher = (async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("fastnear")) return new Response(JSON.stringify({ account_txs: [
+      { transaction_hash: "B86feaGRWcft8iHq6m5Xs52xDQhYCunTKPB4HTUJDJKG", tx_block_timestamp: ns("2026-11-13T00:47:56Z"), is_signer: false },
+      { transaction_hash: "GUyJ6fZWpRDcGycr5o91Uisj6MmZQbzRmPdPk4zgRk44", tx_block_timestamp: ns("2026-11-12T23:48:29Z"), is_signer: false },
+      { transaction_hash: "HFfwwGs6av4Mgu5crq4r7xx4gNk5sDGUw7ZTY4wSocbG", tx_block_timestamp: ns("2026-11-13T00:50:00Z"), is_signer: true },
+    ] }));
+    return new Response(JSON.stringify({ txns: [] }));
+  }) as typeof fetch;
+  // Only the delivery after the route started that the payee did not sign; RPC verification happens downstream.
+  assert.deepEqual(await findNearDeliveryCandidates({ recipient: "codexjames.near", tokenContract: USDC, since }, { fetcher }), ["B86feaGRWcft8iHq6m5Xs52xDQhYCunTKPB4HTUJDJKG"]);
+});
+
+test("tolerates one NEAR index failing but not both", async () => {
+  const since = new Date("2026-11-13T00:00:00Z");
+  const fastOnlyDown = (async (url: string | URL | Request) => String(url).includes("fastnear") ? new Response("down", { status: 503 }) : new Response(JSON.stringify({ txns: [] }))) as typeof fetch;
+  assert.deepEqual(await findNearDeliveryCandidates({ recipient: "codexjames.near", tokenContract: USDC, since }, { fetcher: fastOnlyDown }), []);
+  const bothDown = (async () => new Response("down", { status: 503 })) as typeof fetch;
+  await assert.rejects(findNearDeliveryCandidates({ recipient: "codexjames.near", tokenContract: USDC, since }, { fetcher: bothDown }), /NEAR indexers unavailable/);
+});

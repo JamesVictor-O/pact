@@ -160,15 +160,17 @@ export async function executePayment(paymentId:string,userId:string,authorizatio
   return relayPayment(settlement.id,userId);
 }
 
+const ROUTE_PENDING_MESSAGE="The payment network didn’t confirm receipt yet. Pact will keep retrying; your funds are safe.";
+
 export async function relayPayment(id:string,userId:string){
   const row=await oneOrNull<SettlementRow&{vault_address:string;owner_user_id:string;organizer_nonce:string;authorization_signature:Buffer;authorization_deadline:Date}>(`select s.*,e.vault_address,e.owner_user_id from payment_settlements s join events e on e.id=s.event_id where s.id=$1 and e.owner_user_id=$2`,[id,userId]);if(!row)return null;if(row.status==="routing")return syncRoutedPayment(id,userId);if(row.status==="confirmed"||row.status==="delivered")return settlementMap(row);
   let routeTransferConfirmed=false;
   try{const c=config(),pub=createPublicClient({transport:http(c.rpc)}),wallet=createWalletClient({account:privateKeyToAccount(c.key),transport:http(c.rpc)});let hash=row.transaction_hash as Hex|undefined;
     if(!hash){const signature=`0x${row.authorization_signature.toString("hex")}` as Hex,common=[canonicalBytes32(row.agreement_id),canonicalBytes32(row.payment_id)] as const;hash=row.settlement_mode==="aurora"&&row.payout_route_quote_id?await wallet.writeContract({chain:null,address:row.vault_address as Address,abi:vaultAbi,functionName:"routePayment",args:[...common,canonicalBytes32(row.payout_route_quote_id),row.payout_address as Address,BigInt(row.amount_atomic),BigInt(row.organizer_nonce),BigInt(Math.floor(row.authorization_deadline.getTime()/1000)),signature]}):await wallet.writeContract({chain:null,address:row.vault_address as Address,abi:vaultAbi,functionName:"release",args:[...common,row.payout_address as Address,BigInt(row.amount_atomic),BigInt(row.organizer_nonce),BigInt(Math.floor(row.authorization_deadline.getTime()/1000)),signature]});await database().query(`update payment_settlements set status='submitted',transaction_hash=$2,failure_message=null,updated_at=now() where id=$1`,[id,hash]);}
     const receipt=await pub.waitForTransactionReceipt({hash,confirmations:Number(process.env.MONAD_CONFIRMATIONS??1),timeout:120_000});if(receipt.status!=="success")throw new Error("Payment transaction reverted");routeTransferConfirmed=row.settlement_mode==="aurora";
-    if(row.settlement_mode==="aurora"&&row.payout_route_quote_id){const route=await oneOrNull<{raw_quote:AuroraPayoutQuote}>(`select raw_quote from payout_route_quotes where id=$1 and event_id=$2`,[row.payout_route_quote_id,row.event_id]);if(!route?.raw_quote)throw new Error("The saved Aurora quote is missing");await submitAuroraPayoutDeposit(hash,row.payout_address,route.raw_quote);const routing=await oneOrNull<SettlementRow>(`update payment_settlements set status='routing',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 returning *`,[id]);await database().query(`update payout_route_quotes set status='routing',last_error=null,updated_at=now() where id=$1`,[row.payout_route_quote_id]);return settlementMap(routing!);}
+    if(row.settlement_mode==="aurora"&&row.payout_route_quote_id){const route=await oneOrNull<{raw_quote:AuroraPayoutQuote}>(`select raw_quote from payout_route_quotes where id=$1 and event_id=$2`,[row.payout_route_quote_id,row.event_id]);if(!route?.raw_quote)throw new Error("The saved Aurora quote is missing");/* Reporting the deposit only speeds up NEAR Intents' detection; the confirmed vault transfer is what makes the payout Routing. An upstream failure here is recorded, not fatal. */let submitError:string|null=null;try{await submitAuroraPayoutDeposit(hash,row.payout_address,route.raw_quote);}catch(error){submitError=(error instanceof Error?error.message:"Deposit report failed").slice(0,500);}const routing=await oneOrNull<SettlementRow>(`update payment_settlements set status='routing',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 returning *`,[id]);await database().query(`update payout_route_quotes set status='routing',last_error=$2,updated_at=now() where id=$1`,[row.payout_route_quote_id,submitError]);return settlementMap(routing!);}
     const confirmed=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='confirmed',confirmed_at=now(),failure_message=null,updated_at=now() where id=$1 and status<>'confirmed' returning *`,[id]);if(updated.rows[0]){await db.query(`update expense_payments set paid_amount_minor=least(amount_minor,paid_amount_minor+$2),processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id,row.amount_minor]);await db.query(`update invoices set status='paid',paid_at=coalesce(paid_at,now()),updated_at=now() where agreement_id=$1 and not exists(select 1 from expense_payments p join expenses x on x.id=p.expense_id where x.id=(select expense_id from payment_agreements where id=$1) and p.paid_amount_minor<p.amount_minor)`,[row.agreement_id]);}return updated.rows[0]??row;});return settlementMap(confirmed);
-  }catch(error){const message=error instanceof Error?error.message:"Payment failed";if(routeTransferConfirmed){const pending=await oneOrNull<SettlementRow>(`update payment_settlements set status='submitted',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,message.slice(0,500)]);return settlementMap(pending!);}const failed=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='failed',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,message.slice(0,500)]);await db.query(`update expense_payments set processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id]);return updated.rows[0]!;});return settlementMap(failed);}
+  }catch(error){const message=error instanceof Error?error.message:"Payment failed";if(routeTransferConfirmed){/* Funds already reached the route deposit address; the upstream error (kept on the route for debugging) is not something the organizer can act on. */const pending=await oneOrNull<SettlementRow>(`update payment_settlements set status='submitted',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,ROUTE_PENDING_MESSAGE]);if(row.payout_route_quote_id)await database().query(`update payout_route_quotes set last_error=$2,updated_at=now() where id=$1`,[row.payout_route_quote_id,message.slice(0,500)]);return settlementMap(pending!);}const failed=await transaction(async db=>{const updated=await db.query<SettlementRow>(`update payment_settlements set status='failed',failure_message=$2,updated_at=now() where id=$1 returning *`,[id,message.slice(0,500)]);await db.query(`update expense_payments set processing_started_at=null,updated_at=now() where id=$1`,[row.payment_id]);return updated.rows[0]!;});return settlementMap(failed);}
 }
 
 async function resolveVaultRoute(vaultAddress:string,routeId:string,outcome:"delivered"|"refunded"){
@@ -179,7 +181,38 @@ async function resolveVaultRoute(vaultAddress:string,routeId:string,outcome:"del
   if(current!==1)throw new Error(`The event vault route cannot be marked ${outcome} from its current state`);
   const hash=await wallet.writeContract({chain:null,address:vaultAddress as Address,abi:vaultAbi,functionName:outcome==="delivered"?"resolveRouteDelivered":"resolveRouteRefunded",args:[canonicalRouteId]});
   const receipt=await publicClient.waitForTransactionReceipt({hash,confirmations:Number(process.env.MONAD_CONFIRMATIONS??1),timeout:120_000});
-  if(receipt.status!=="success")throw new Error(`The event vault could not finalize the ${outcome} route`);
+  if(receipt.status!=="success"){
+    // Another sync may have resolved the same route first; that is the outcome we wanted.
+    const after=Number(await publicClient.readContract({address:vaultAddress as Address,abi:vaultAbi,functionName:"routeStatus",args:[canonicalRouteId]}));
+    if(after!==expected)throw new Error(`The event vault could not finalize the ${outcome} route`);
+  }
+}
+
+/**
+ * Background reconciliation for routed (cross-chain) payouts, so pages never depend on someone
+ * pressing "Check delivery". Each routing settlement is claimed via last_synced_at (at most one
+ * sync per route every 15s across concurrent requests), then synced through the same verified path
+ * as the manual check. Returns once all syncs finish or the time budget runs out; anything still
+ * running is returned as `pending` so callers can keep it alive with next/server `after()`.
+ */
+export async function reconcileRoutedPayments(scope:{eventId?:string;paymentId?:string},userId:string,budgetMs=4000){
+  if(!scope.eventId&&!scope.paymentId)return{pending:Promise.resolve()};
+  // 'submitted' with a transaction hash means the vault already paid the deposit address but reporting the
+  // deposit to Aurora failed (e.g. an upstream outage). Retrying reuses that transaction; it never sends funds twice.
+  const rows=await database().query<{id:string;status:string}>(`select s.id,s.status from payment_settlements s join events e on e.id=s.event_id
+    where (s.status='routing' or (s.status='submitted' and s.transaction_hash is not null)) and s.settlement_mode='aurora' and s.payout_route_quote_id is not null and e.owner_user_id=$1
+      and ($2::text is null or s.event_id=$2) and ($3::text is null or s.payment_id=$3)`,[userId,scope.eventId??null,scope.paymentId??null]);
+  const syncs=rows.rows.map(async({id,status})=>{
+    const claimed=await oneOrNull<{id:string}>(`update payout_route_quotes q set last_synced_at=now() from payment_settlements s
+      where s.id=$1 and q.id=s.payout_route_quote_id and (q.last_synced_at is null or q.last_synced_at<now()-interval '15 seconds') returning q.id`,[id]);
+    if(!claimed)return;
+    try{if(status==="submitted")await relayPayment(id,userId);else await syncRoutedPayment(id,userId);}catch(error){
+      await database().query(`update payout_route_quotes set last_error=$2,updated_at=now() where id=$1`,[claimed.id,(error instanceof Error?error.message:"Delivery check failed").slice(0,500)]);
+    }
+  });
+  const pending=Promise.allSettled(syncs).then(()=>undefined);
+  await Promise.race([pending,new Promise(resolve=>setTimeout(resolve,budgetMs))]);
+  return{pending};
 }
 
 export async function syncRoutedPayment(id:string,userId:string){
