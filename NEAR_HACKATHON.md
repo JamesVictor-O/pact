@@ -2,11 +2,11 @@
 
 Pact is the financial operating layer for events: funding comes in, agreements and payments go out, and Pact tracks the state in between. Every event has one USDC vault on Monad. **NEAR Intents is how money enters and leaves that vault across chains.** We call it through Aurora's 1Click-compatible API.
 
-Tracks: **Real-World Money** (primary: payroll/invoicing/merchant payments on stablecoins via NEAR Intents), **Privacy**, **Autonomous Business**.
+Tracks: **Real-World Money** (primary: invoicing and payroll for events on stablecoins via NEAR Intents) and **Privacy** (confidential NEAR Intents routes for payouts and contributions). Pact uses no AI agents, so it is not entered in agent tracks.
 
 ## What is judged (disclosure per Q-002 / Q-003 / Q-004)
 
-Pact existed before this hackathon. It placed 3rd at the Monad hackathon. All code up to the tag [`pre-hackathon`](https://github.com/JamesVictor-O/pact/releases/tag/pre-hackathon) (commit `db2420e`, 2026-10-13) is **baseline**. That includes the Monad contracts, the agreement/allocation product, and inbound Aurora routing from EVM and Stellar.
+Pact existed before this hackathon. All code up to the tag [`pre-hackathon`](https://github.com/JamesVictor-O/pact/releases/tag/pre-hackathon) (commit `db2420e`, 2026-10-13) is **baseline**. That includes the Monad contracts, the agreement/allocation product, and inbound Aurora routing from EVM and Stellar.
 
 **Judged diff:** [`pre-hackathon...hackathon-submission`](https://github.com/JamesVictor-O/pact/compare/pre-hackathon...hackathon-submission)
 
@@ -74,12 +74,15 @@ Every line should say `PASS`. The evidence is written to `docs/near-canary/`.
 
 | Evidence | Value |
 |---|---|
-| Event vault | _pending_ |
-| Monad `routePayment` tx | _pending_ |
-| Aurora deposit address / correlation ID | _pending_ |
-| NEAR delivery tx (Aurora-reported) | _pending_ |
-| `verify-delivery.ts` result | _pending_ |
-| Vault `routeStatus` after resolution | _pending (expect 2 = Delivered)_ |
+| Event vault | [`0x63181a7a3d4040d7FC41eC1D8A22a64CA1ff2194`](https://monadscan.com/address/0x63181a7a3d4040d7FC41eC1D8A22a64CA1ff2194) (factory `0x0115…Fa31`) |
+| Payment | $0.20 deposit of a $0.40 agreement, payee `codexjames.near`, quoted minimum 0.197917 USDC |
+| Monad `routePayment` tx | [`0x6040ce2c…4a92df`](https://monadscan.com/tx/0x6040ce2c0c2e49a057915963a66482dd5400de6ff68c47cffd16c3403b4a92df) (2026-11-12 23:44:42 UTC) |
+| Aurora deposit address / correlation ID | `0x1aF8CA97BF84D16572c08dcAFeAe98b9cAE9FaCE` / `8ab7bcb6-2b53-4510-adef-02b0c4f1e7ae` |
+| NEAR delivery tx (Aurora-reported) | [`GUyJ6fZWpRDcGycr5o91Uisj6MmZQbzRmPdPk4zgRk44`](https://nearblocks.io/txns/GUyJ6fZWpRDcGycr5o91Uisj6MmZQbzRmPdPk4zgRk44) (SUCCESS at 23:48:34 UTC) |
+| `verify-delivery.ts` result | `verified: true`, 199917 atomic (0.199917 USDC) from `intents.near` to `codexjames.near`, native USDC, final |
+| Vault `routeStatus` after resolution | **2 = Delivered**; Pact recorded the verified hash at 23:59:27 UTC and counted $0.20 as paid |
+
+**What this run showed.** NEAR Intents completed the swap about 4 minutes after the vault paid out, but Aurora's status endpoint kept returning `PENDING_DEPOSIT` for hours afterwards. Pact never marked the payment paid on the vault transfer alone; it stayed *routing* until the NEAR transfer was verified on public RPC. Pact now re-checks routed payouts automatically when the event's pages load (at most once per route every 15 s), so nobody has to press *Check delivery*.
 
 ### 2. Refund canary
 
@@ -109,6 +112,18 @@ Then screenshot Monadscan and [explorer.near-intents.org](https://explorer.near-
 | Can the event vault be linked to the payee? | _pending_ | _pending_ |
 
 Expected, per the [Aurora Confidential Intents docs](https://docs.intents.aurora.dev/confidential-intents.md): the confidential rail hides the origin wallet, the routing path, and the link between source and destination. The destination transfer itself stays public. The canary checks whether that holds for a Monad vault payout.
+
+### Private contribution from Base (extra)
+
+A sponsor used the event's support link with *Private contribution* ticked and paid from Base.
+
+| Evidence | Value |
+|---|---|
+| Base deposit tx | [`0xe2e60d1f…4353d0`](https://basescan.org/tx/0xe2e60d1f5c2d9019175498a7d0492132693a84f3310fd348d46e19570acc96b5): 0.5 USDC to the confidential persistent address `0x3756B5fFF2412D9435E49b0C59b610c089a97a5f` (23:32:28 UTC) |
+| Monad settlement into the vault | [`0x640e89e6…51760e`](https://monadscan.com/tx/0x640e89e6e941ccd18e076d4e5f5c93ef397b302f3cacd506ec4c99453e51760e): 0.498225 USDC from the NEAR Intents settlement address (23:33:59 UTC) |
+| Pact receipt | `confirmed`, $0.49 credited at 23:34:29 UTC after Pact verified the Monad USDC transfer into the vault |
+
+For this confidential route Aurora still reported enough for Pact to verify and credit the deposit, so the fail-closed path was not needed.
 
 ### 4. NEAR-source inbound canary
 
