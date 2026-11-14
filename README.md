@@ -370,3 +370,4 @@ Never put relayer or deployer keys in `NEXT_PUBLIC_*` variables. `.env.local` is
 - **Application:** Next.js 16, React 19, viem, framer-motion, lucide-react, pg, jose, three, `@dynamic-labs/sdk-react-core`, `@category-labs/mera`, `@fontsource/inter`.
 - **Contracts:** Solidity with OpenZeppelin Contracts (ECDSA, EIP712, SafeERC20, ReentrancyGuard), Foundry and forge-std.
 - **AI-generated code (Q-005):** much of the hackathon code, tests and documentation was written with an AI coding assistant (Claude Code) and reviewed by the team. All of it is verified by the test suite and the mainnet canaries above.
+
